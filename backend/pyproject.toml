@@ -1,0 +1,83 @@
+[project]
+name = "ray-backend"
+version = "0.1.0"
+description = "Ray — personal AI assistant backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "pgvector>=0.3.6",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "structlog>=24.4.0",
+    "python-dotenv>=1.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "import-linter>=2.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
+# B008 flags function calls in argument defaults, which is exactly how FastAPI
+# dependency injection is written.
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/versions/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["pgvector.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# One event loop for the whole run: the engine and its connection pool are created
+# once, and a per-test loop would close connections out from under them.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+
+# Architectural boundaries from ADR-0012, enforced rather than merely documented.
+[tool.importlinter]
+root_package = "ray"
+
+[[tool.importlinter.contracts]]
+name = "Agents never reach the database or external services directly"
+type = "forbidden"
+source_modules = ["ray.agents"]
+forbidden_modules = ["ray.db", "ray.integrations", "ray.services"]
+
+[[tool.importlinter.contracts]]
+name = "Only services touch the database"
+type = "forbidden"
+source_modules = ["ray.api", "ray.core", "ray.tools", "ray.llm"]
+forbidden_modules = ["ray.db.models"]
+# Reaching the database *through* a service is the intended path; what is banned
+# is importing a model directly.
+allow_indirect_imports = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ray"]

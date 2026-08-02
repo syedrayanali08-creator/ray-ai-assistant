@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.local
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+
+# Models and data
+.cache/
+# Downloaded model weights (embeddings, STT, TTS) — never committed.
+/models/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

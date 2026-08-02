@@ -1,0 +1,22 @@
+services:
+  db:
+    # pgvector image rather than plain postgres: memory embeddings live in the
+    # same database as everything else (ADR-0002).
+    image: pgvector/pgvector:pg16
+    container_name: ray-db
+    environment:
+      POSTGRES_USER: ray
+      POSTGRES_PASSWORD: ray
+      POSTGRES_DB: ray
+    ports:
+      - "5433:5432"
+    volumes:
+      - ray-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ray -d ray"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ray-db-data:
