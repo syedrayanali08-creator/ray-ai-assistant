@@ -1,24 +1,54 @@
-# `/docs/10 Development Roadmap.md`
-
 # Ray — Development Roadmap
 
 ## Purpose
 
 This document defines the implementation order for Ray.
 
-The goal is to build a working personal AI assistant as quickly as possible while maintaining a structure that allows future expansion.
+**This document is the canonical development order.** Where `docs/01` and `docs/14`
+previously listed their own priority orders, they now defer to this file.
 
-Development should prioritize working functionality over unnecessary complexity.
+The goal is a working personal AI assistant as quickly as possible, on a structure that
+allows future expansion. Each phase produces a usable improvement, and no phase breaks a
+previous one.
 
 ---
 
 # Development Strategy
 
-Ray should be built incrementally.
+* Build incrementally. One working component at a time.
+* Every phase ends with: it runs, it is tested, its docs are updated, and it can be
+  demonstrated.
+* Do not build advanced features before the foundation exists.
+* **Voice is architected from Phase 1 and implemented progressively** (ADR-0009). No
+  phase blocks on voice quality, and no phase leaves voice impossible to add.
 
-Each phase should produce a usable improvement.
+Technical decisions referenced below are recorded in `docs/adr/`.
 
-Do not build advanced features before the foundation exists.
+---
+
+# Phase 0 — Decisions and Scaffolding
+
+## Goal
+
+Resolve every open technical decision and stand up the development environment before
+any feature code is written.
+
+## Tasks
+
+* Architecture Decision Records for all major choices (ADR-0001 … ADR-0014)
+* Update `/docs` to match the decisions (schema, API, UI, integrations, security)
+* `docker-compose.yml` with PostgreSQL + pgvector
+* Backend and frontend project skeletons
+* `.env.example` documenting every variable
+* Linting, type checking, tests, and CI wired up
+* Pre-commit hooks
+* `README.md` with a working quickstart
+
+## Completion Criteria
+
+* every contradiction in the documentation is resolved and recorded
+* `docker compose up` plus one dev command boots an empty frontend and backend
+* CI is green on an empty project
 
 ---
 
@@ -26,34 +56,26 @@ Do not build advanced features before the foundation exists.
 
 ## Goal
 
-Create the basic Ray application structure.
+Create the basic Ray application structure with the real data model in place.
 
 ## Tasks
 
-Set up:
-
-* frontend application
-* backend application
-* database
-* project structure
-* environment configuration
-* version control
-
-Implement:
-
-* basic dashboard
-* basic API communication
-* basic user interface
-
----
+* Full V1 database schema (`docs/06`) with the first Alembic migration
+* Seed script creating the single local user
+* FastAPI application with health, config, and the single-user auth dependency
+  (ADR-0006)
+* Typed frontend API client generated from OpenAPI
+* Jarvis-style dashboard shell: status bar, conversation area, panel rail
+* **Voice architecture stubs:** `ray/voice/` interfaces, modality-aware core contract,
+  `speech_text` on the message model (ADR-0009)
 
 ## Completion Criteria
 
 Ray can:
 
-* run locally
+* run locally from a clean clone by following the README
 * display the dashboard
-* communicate between frontend and backend
+* communicate between frontend and backend against real seeded data
 
 ---
 
@@ -65,24 +87,21 @@ Create the main Ray interaction system.
 
 ## Tasks
 
-Implement:
-
-* AI chat interface
-* conversation storage
-* Executive Agent
-* basic response generation
-* conversation history
-
----
+* `LLMProvider` abstraction with the Gemini, Groq, and Ollama adapters (ADR-0001)
+* Executive Agent in single-agent mode (no routing yet)
+* `POST /chat/message` streaming over SSE (ADR-0007)
+* Conversation and message persistence, conversation history
+* Chat UI with markdown, code formatting, and streaming rendering
+* **Voice round trip using browser STT/TTS fallbacks** — low quality, but Ray can be
+  spoken to and can speak back
 
 ## Completion Criteria
 
 User can:
 
-* open Ray
-* type a message
-* receive a response
-* continue conversations
+* open Ray, type or speak a message, and receive a streamed response
+* continue and revisit conversations
+* switch LLM provider with one environment variable
 
 ---
 
@@ -90,124 +109,72 @@ User can:
 
 ## Goal
 
-Give Ray persistent knowledge.
+Give Ray persistent knowledge that measurably changes its answers.
 
 ## Tasks
 
-Implement:
-
-* memory database
-* memory creation
-* memory retrieval
-* memory search
-* memory management interface
-
----
+* Local embeddings (ADR-0003) and the `memories` table with an HNSW index
+* Write path: extraction, importance scoring, dedupe and merge (ADR-0013)
+* Retrieval: hybrid similarity + importance + recency + usage scoring
+* Context assembly with a token budget
+* Memory API and Memory view: search, edit, delete, disable categories, view provenance
+* `docs/15` evaluation set covering memory behaviour
 
 ## Completion Criteria
 
-Ray can:
-
-* remember important information
-* retrieve relevant context
-* use previous knowledge in conversations
+* in a brand-new conversation Ray correctly answers "what am I working on?"
+* deleting a memory immediately stops Ray using it
+* the evaluation set passes
 
 ---
 
-# Phase 4 — Agent System
+# Phase 4 — Agent System and Tool Manager
 
 ## Goal
 
-Create specialized Ray capabilities.
+Create specialized Ray capabilities behind one conversational surface.
 
-Implement:
+## Tasks
 
-## Planning Agent
-
-Features:
-
-* tasks
-* scheduling
-* priorities
-
----
-
-## Coding Agent
-
-Features:
-
-* project assistance
-* code explanations
-* development guidance
-
----
-
-## Learning Agent
-
-Features:
-
-* teaching
-* study planning
-* progress tracking
-
----
-
-## Research Agent
-
-Features:
-
-* research organization
-* topic exploration
-
----
+* Agent base class and registry (ADR-0005)
+* Planning, Coding, Learning, and Research agents; memory exposed as a service and a
+  tool rather than an agent
+* Executive routing via function calling, single-agent by default, explicit fan-out for
+  cross-domain requests (ADR-0008)
+* Tool Manager: registry, permissions, timeouts, error normalisation, activity logging
+* Approval gate and approval cards for side-effecting tools (ADR-0014)
+* Internal tools: tasks, projects, calendar, memory
+* Agent Status panel and agent trace visualization
 
 ## Completion Criteria
 
-Ray can route requests to appropriate agents.
+* Ray routes requests to the appropriate agent and says which one it used
+* the "Plan my week" user flow from `docs/13` works end to end
+* no side-effecting tool can run without explicit approval
 
 ---
 
-# Phase 5 — Productivity Integrations
+# Phase 5 — Productivity Surfaces and Integrations
 
 ## Goal
 
-Connect Ray with existing tools.
+Connect Ray with the user's existing tools, in priority order (ADR-0010).
 
-Priority:
+## Tasks
 
-## Calendar
-
-Capabilities:
-
-* view events
-* create events
-* schedule tasks
-
----
-
-## Notion / Knowledge System
-
-Capabilities:
-
-* read notes
-* create notes
-* organize information
-
----
-
-## GitHub
-
-Capabilities:
-
-* inspect repositories
-* understand projects
-* assist development
-
----
+* Task, Project, and Calendar views; project dashboards with progress
+* **GitHub (priority 1):** read-only repository tree, file contents, commits, issues
+* **Calendar (priority 2):** local calendar as default, ICS import/export, optional
+  Google Calendar sync behind the same adapter
+* **Knowledge (priority 3):** Obsidian vault read/create/link; Notion optional
+* **Local files (priority 4):** read and summarise within allow-listed directories
+* Integration API and a settings page with per-integration permission controls
 
 ## Completion Criteria
 
-Ray can interact with external tools.
+* Ray answers "what should I work on next in Starfall Sprint?" using the real repository
+* Ray can view and create calendar events, with creation gated by approval
+* integrations fail loudly and explain themselves
 
 ---
 
@@ -215,19 +182,26 @@ Ray can interact with external tools.
 
 ## Goal
 
-Make Ray feel like a true assistant.
+Deliver the voice-first experience properly.
 
-Implement:
+## Tasks
 
-* speech-to-text
-* text-to-speech
-* voice controls
+* Local speech-to-text with `faster-whisper`
+* Local text-to-speech with Piper
+* `/voice/stream` WebSocket for post-activation audio
+* Listening / Processing / Responding states in the UI
+* Latency tuning on the spoken path
 
----
+## Sub-phase 6b — Wake Word
+
+* openWakeWord "Ray" detection running in the client
+* Always-listening indicator and a revocable microphone permission
+* Barge-in (interrupting Ray while it speaks)
 
 ## Completion Criteria
 
-User can speak with Ray naturally.
+* the user says "Ray", speaks a request, and hears a natural spoken answer
+* the wake word runs locally and no audio leaves the machine before activation
 
 ---
 
@@ -235,96 +209,85 @@ User can speak with Ray naturally.
 
 ## Goal
 
-Improve the Jarvis-style experience.
+Complete the Jarvis-style experience.
 
-Implement:
+## Tasks
 
-* animations
-* agent visualization
-* project panels
-* memory panels
-* system status
-
----
+* HUD design pass: dark theme, glow, system panels
+* Agent flow visualization and richer Ray Status
+* Project, memory, and learning panels
+* Purposeful motion only; empty, loading, and error states everywhere
+* Keyboard-first navigation
 
 ## Completion Criteria
 
-Ray feels like a complete AI assistant interface.
+`docs/09` completion criteria are met and the interface is portfolio quality.
 
 ---
 
-# Phase 8 — Self Improvement
+# Phase 8 — Self Improvement and Hardening
 
 ## Goal
 
-Allow Ray to become easier to improve.
+Make Ray easy to keep improving, and safe to rely on.
 
-Implement:
+## Tasks
 
-* error detection
-* improvement suggestions
-* configuration management
-* better tool handling
+* Structured logging, error taxonomy, and secret redaction
+* Integration health checks with self-diagnosis messaging
+* "Ray, this workflow is annoying" → improvement task flow (`docs/04`)
+* Configuration management UI
+* Full data export and backup
+* Release tagging and changelog per `docs/13`
 
 ---
 
 # Development Priorities
-
-Priority order:
 
 1. Working application
 2. AI conversation
 3. Memory
 4. Agents
 5. Integrations
-6. Voice
-7. Visual improvements
+6. Voice quality and wake word
+7. Visual polish
 8. Advanced automation
+
+Voice *architecture* is not in this priority list because it is a Phase 1 constraint,
+not a later feature.
 
 ---
 
 # Testing Requirements
 
-Every major feature should include:
+Every major feature ships with:
 
-* functionality testing
-* error handling
-* documentation
+* functionality tests
+* error-handling tests
+* updated documentation
+* additions to the evaluation set in `docs/15` where AI behaviour is involved
 
-Do not add new features that break existing functionality.
+Do not add features that break existing functionality.
 
 ---
 
 # Free Technology Requirement
 
-Throughout development:
-
-Prefer:
-
-* free APIs
-* open-source tools
-* local solutions
-* free hosting tiers
-
-Avoid:
-
-* paid dependencies
-* unnecessary subscriptions
-* vendor lock-in
+Prefer free APIs, open-source tools, local solutions, and free hosting tiers. Avoid paid
+dependencies, subscriptions, and vendor lock-in. Any unavoidable paid dependency must be
+identified, justified, and approved before adoption.
 
 ---
 
 # Definition of Complete Version 1
 
-Ray Version 1 is complete when:
+Ray V1 is complete when:
 
-* user can interact through text and voice
-* Ray remembers user context
-* Ray manages tasks and schedules
-* Ray tracks projects
-* Ray assists coding
-* Ray teaches concepts
-* Ray researches topics
-* Ray connects to external tools
+* the user can interact through text and voice
+* Ray remembers user context and uses it
+* Ray manages tasks, schedules, and projects
+* Ray assists with coding, teaching, and research
+* Ray connects to external tools through the Tool Manager
+* Ray explains which agent, tool, and memories it used
 * Ray has a polished Jarvis-inspired dashboard
-* Ray operates without additional paid services
+* Ray runs locally with no paid services

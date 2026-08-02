@@ -369,13 +369,19 @@ Can access:
 
 ---
 
-# 6. Memory Agent
+# 6. Memory System (service, not an agent)
 
 ## Purpose
 
-The Memory Agent manages Ray's long-term understanding of the user.
+The memory system manages Ray's long-term understanding of the user.
 
 Memory is one of Ray's most important systems.
+
+**Implementation note (ADR-0005):** memory is a *service* in `ray/memory/`, not an agent.
+Retrieval happens on every single request, so putting it behind an LLM turn would add
+latency and non-determinism to the hot path. Ray Core always calls it directly, and it is
+additionally exposed to agents as the `memory.search` / `memory.write` tools. Everything
+described below still applies — only the execution model differs.
 
 ---
 

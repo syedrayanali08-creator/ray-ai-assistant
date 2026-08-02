@@ -231,6 +231,9 @@ Executive Agent:
 
 # 5. Specialized Agents
 
+Agents are **code modules**, not database rows (ADR-0005). The database stores only
+runtime state: whether an agent is enabled, user overrides, and an activity log.
+
 Agents should follow a common structure.
 
 Each agent should contain:
@@ -292,13 +295,18 @@ Handles:
 
 ---
 
-## Memory Agent
+## Memory (service, not an agent)
 
 Handles:
 
 * saving memories
 * retrieving context
 * updating knowledge
+
+Memory retrieval runs on **every** request and must be fast and deterministic, so it is
+implemented as a service that Ray Core always calls rather than as an agent behind an
+LLM turn. Agents can additionally call it as a tool (`memory.search`, `memory.write`)
+when they need to look something up mid-reasoning (ADR-0005).
 
 ---
 
@@ -356,23 +364,10 @@ Stores:
 
 # Memory Storage
 
-The system should prioritize free solutions.
-
-Possible options:
-
-Primary database:
-
-* PostgreSQL
-
-Semantic memory:
-
-* PostgreSQL with vector extensions
-
-Alternative:
-
-* local vector databases
-
-The final implementation should avoid paid memory services.
+**Decided:** PostgreSQL 16 + `pgvector` as the single store for both relational data and
+semantic memory (ADR-0002), with embeddings generated locally by
+`sentence-transformers` (ADR-0003). No paid memory services, and the memory corpus never
+leaves the machine.
 
 ---
 
@@ -424,23 +419,27 @@ Future capability:
 
 # 8. Voice System
 
-Voice should support:
+**Ray is voice-first (ADR-0009).** The full pipeline is part of the architecture from
+Phase 1, even though its implementation quality improves across phases:
 
-Input:
+```
+Microphone → Wake word (client) → VAD → STT (server) → Ray Core → TTS → Speaker
+```
 
-* speech-to-text
+Consequences for the rest of the architecture:
 
-Output:
+* Ray Core takes an `input_modality` and an `output_modality`; text is a special case of
+  the voice path, not the other way around.
+* Agents produce a `speech_text` variant alongside their markdown output, because a good
+  spoken answer is shorter and contains no code blocks.
+* Wake-word detection runs **in the client** so audio never leaves the machine before
+  activation; post-activation audio streams over `/voice/stream`.
 
-* text-to-speech
+Chosen components, all free and local: openWakeWord, `faster-whisper`, and Piper, with
+browser Web Speech / SpeechSynthesis as zero-setup fallbacks.
 
-Requirements:
-
-* free options preferred
-* modular implementation
-* ability to replace providers later
-
-The voice layer should be independent from the AI layer.
+The voice layer remains behind interfaces (`WakeWordDetector`, `SpeechToText`,
+`TextToSpeech`) and is independent from the AI layer.
 
 ---
 

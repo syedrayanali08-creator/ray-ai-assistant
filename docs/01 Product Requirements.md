@@ -361,6 +361,10 @@ The system must:
 * avoid exposing private information
 * store credentials securely
 * allow user control over stored memory
+* require explicit user approval for any action that changes state (ADR-0014)
+
+V1 uses a single local user and a bearer token rather than a full authentication system
+(ADR-0006).
 
 ---
 
@@ -369,7 +373,7 @@ The system must:
 Ray Version 1 is complete when:
 
 * user can communicate with Ray through text
-* user can communicate through voice
+* user can communicate through voice, including wake-word activation (ADR-0009)
 * Ray has persistent memory
 * Ray can manage tasks
 * Ray can manage calendar events
@@ -385,18 +389,9 @@ Ray Version 1 is complete when:
 
 # Development Priority Order
 
-1. Project foundation
-2. User interface
-3. AI conversation system
-4. Memory system
-5. Agent architecture
-6. Task management
-7. Calendar integration
-8. Coding assistant
-9. Learning assistant
-10. Research assistant
-11. Voice interaction
-12. Dashboard improvements
+See **`docs/10 Development Roadmap`**, which is the canonical development order. The
+list previously duplicated here conflicted with `docs/10` and `docs/14` and has been
+removed so there is exactly one source of truth for sequencing.
 
 ---
 

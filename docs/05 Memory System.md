@@ -27,6 +27,13 @@ Ray's memory system should:
 
 ---
 
+> **Policy is specified in ADR-0013.** The write triggers, importance scale, dedupe and
+> merge thresholds, retrieval scoring formula, and expiry rules referenced throughout
+> this document are defined concretely there. This document states the intent; the ADR
+> states the mechanism.
+
+---
+
 # Memory Principles
 
 ## 1. Useful Over Complete
@@ -308,13 +315,23 @@ Ray should retrieve:
 
 # Memory Storage Process
 
-When Ray detects potentially useful information:
+Extraction runs **after** the response is produced, off the critical path, so it never
+adds latency to a reply.
 
-1. Identify information type.
-2. Determine importance.
-3. Check for duplicates.
-4. Store if valuable.
-5. Allow future retrieval.
+1. Identify information type (category).
+2. Determine importance (1–5).
+3. Check for duplicates by embedding similarity within the category:
+   * ≥ 0.95 — discard as duplicate, refresh the existing memory
+   * 0.85–0.95 — merge into the existing memory and supersede the old row
+   * < 0.85 — insert as new
+4. Store only if durable (true beyond this conversation) *and* actionable (it would
+   change a future response).
+5. Record provenance: source, source message, and a one-line `why`.
+
+Structured data that already lives in `projects`, `tasks`, or `learning_records` is not
+duplicated into prose memories.
+
+The user can always force a write with "Ray, remember that…".
 
 ---
 
@@ -342,15 +359,20 @@ Stores:
 
 ## Semantic Search
 
-Used for finding related memories.
+**PostgreSQL with the `pgvector` extension** (ADR-0002) — the same database as everything
+else, so a memory query can filter by category and project *and* rank by similarity in
+one statement.
 
-Preferred options:
+**Embeddings are generated locally** with `sentence-transformers`
+(`all-MiniLM-L6-v2`, 384 dimensions) (ADR-0003). The memory corpus — the most sensitive
+data Ray holds — never leaves the machine, there is no quota on the hot path, and there
+is no cost.
 
-* PostgreSQL vector extension
-* local vector databases
-* open-source embeddings
+Retrieval is hybrid, not pure similarity: similarity, importance, recency, and past
+usage are combined, with a boost for memories scoped to the active project. See
+ADR-0013.
 
-Avoid paid memory services.
+No paid memory services are used.
 
 ---
 

@@ -59,38 +59,52 @@ The API should be:
 * easy to extend
 * free from unnecessary complexity
 
-Preferred approach:
+Approach (ADR-0007):
 
-* REST API initially
-* WebSocket support later for real-time interaction
+* **REST for everything.**
+* **Server-Sent Events** for streaming chat responses, agent trace events, and approval
+  requests. SSE rather than WebSockets because the flow is one-directional and SSE is
+  plain HTTP, so it reuses the existing auth and needs no separate connection lifecycle.
+* **One WebSocket exception:** `/voice/stream`, which carries microphone audio after
+  wake-word activation and is genuinely bidirectional (ADR-0009).
 
 ---
 
 # Core API Sections
 
-## 1. Authentication API
+## 1. Authentication
 
-Purpose:
+**V1: single local user, static bearer token (ADR-0006).**
 
-Manage user access.
+There is no registration or login in V1. One user row is seeded at setup. Every request
+outside `/health` must carry:
+
+```
+Authorization: Bearer $RAY_API_TOKEN
+```
+
+The backend binds to `127.0.0.1` by default. Identity is resolved in exactly one place,
+the `get_current_user()` dependency, so real authentication is a single-file
+replacement later.
 
 Endpoints:
 
 ```
-POST /auth/register
-
-POST /auth/login
-
-POST /auth/logout
-
-GET /auth/user
+GET /auth/user      -- returns the current user profile and settings
 ```
 
-Responsibilities:
+### Future (not V1)
 
-* user identity
-* sessions
-* permissions
+If Ray ever becomes multi-user or is exposed beyond localhost, add:
+
+```
+POST /auth/register
+POST /auth/login
+POST /auth/logout
+```
+
+backed by OIDC or session cookies. Every table already carries `user_id`, so no schema
+change is required.
 
 ---
 
@@ -115,9 +129,26 @@ Request example:
 ```json
 {
   "message": "Help me plan my week",
-  "conversation_id": "123"
+  "conversation_id": "123",
+  "input_modality": "text",
+  "output_modality": "text"
 }
 ```
+
+`POST /chat/message` responds as an **SSE stream** carrying typed events:
+
+```
+event: trace     data: {"stage":"routing"}
+event: trace     data: {"agent":"coding","memories_used":4}
+event: tool      data: {"tool":"github.read_repo","status":"running"}
+event: approval  data: {"invocation_id":"...","tool":"calendar.create_event","payload":{...}}
+event: token     data: {"text":"Next you should "}
+event: done      data: {"message_id":"...","speech_text":"...","trace":{...}}
+```
+
+The `trace` object drives the Ray Status panel and the agent visualization, and
+satisfies the transparency requirement in `docs/12`. `speech_text` is the spoken variant
+of the answer (ADR-0009).
 
 Backend process:
 
@@ -138,12 +169,19 @@ Manage Ray's specialized agents.
 
 Endpoints:
 
+Agents are code modules (ADR-0005); this API exposes their runtime state and activity,
+not their definitions.
+
 ```
-GET /agents
+GET  /agents                    -- registry entries with enabled state
 
-GET /agents/{id}
+GET  /agents/{name}
 
-POST /agents/execute
+PUT  /agents/{name}             -- enable/disable, user overrides
+
+GET  /agents/activity           -- audit log of what agents did
+
+POST /agents/execute            -- direct invocation, for debugging and tests
 ```
 
 Example:
@@ -156,6 +194,9 @@ Request:
   "task": "Analyze my project"
 }
 ```
+
+In normal operation agents are never called directly by the frontend — the Executive
+Agent routes to them (`docs/03`).
 
 Response:
 
@@ -249,13 +290,17 @@ PUT /tasks/{id}
 DELETE /tasks/{id}
 ```
 
-Task fields:
+Task fields (one unified model, ADR-0004):
 
 * title
 * description
 * priority
 * deadline
 * status
+* `project_id` (optional — set means the task belongs to a project)
+
+A project's tasks are fetched with `GET /tasks?project_id=...`. There is no separate
+project-task resource.
 
 ---
 
@@ -297,15 +342,65 @@ GET /integrations
 
 POST /integrations/connect
 
+POST /integrations/{id}/check      -- health check, powers self-diagnosis
+
 DELETE /integrations/{id}
 ```
 
-Examples:
+Examples, in V1 priority order (ADR-0010):
 
-* GitHub
-* Notion
-* Calendar
-* File systems
+1. GitHub (read-only in V1)
+2. Calendar (local default, Google opt-in)
+3. Knowledge (Obsidian vault; Notion optional)
+4. Local files (allow-listed directories only)
+
+Credentials are never sent to or returned by this API — only a reference to where the
+secret is stored.
+
+---
+
+# 9. Approvals API
+
+Purpose:
+
+Gate every side-effecting tool call behind explicit user consent (ADR-0014).
+
+Endpoints:
+
+```
+GET  /approvals/pending
+
+POST /approvals/{invocation_id}/approve
+
+POST /approvals/{invocation_id}/reject
+
+GET  /tool-permissions
+
+PUT  /tool-permissions/{tool_name}     -- ask | always_allow | never
+```
+
+A pending approval is surfaced mid-stream as an `approval` SSE event; the orchestrator
+suspends the tool loop until the decision arrives.
+
+---
+
+# 10. Voice API
+
+Purpose:
+
+Support the voice-first pipeline (ADR-0009).
+
+Endpoints:
+
+```
+POST /voice/stt          -- audio -> transcript (faster-whisper, local)
+
+POST /voice/tts          -- text -> audio       (Piper, local)
+
+WS   /voice/stream       -- streamed audio after wake-word activation
+```
+
+Wake-word detection runs in the client and never streams audio before activation.
 
 ---
 

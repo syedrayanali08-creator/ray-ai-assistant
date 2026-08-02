@@ -285,13 +285,27 @@ Repository
 
 # Tool Manager
 
+The layering is four levels, not three (ADR-0010):
+
+```
+Agent  →  Tool Manager  →  Adapter (interface)  →  Integration (concrete client)
+```
+
+An **adapter** is a capability interface (e.g. `CalendarAdapter`); an **integration** is
+one implementation of it (`LocalCalendar`, `GoogleCalendar`, `ICSCalendar`). Swapping
+providers is a configuration change and the agent never notices.
+
+Adapters exist where multiple providers realistically compete — calendar and knowledge.
+GitHub and the file system have a single implementation each and do not get a
+speculative interface.
+
 The Tool Manager controls:
 
-* available integrations
-* authentication
-* permissions
-* API calls
-* errors
+* the tool registry and the JSON schemas agents see
+* authentication and credential injection — secrets never enter an agent's context
+* permissions and the approval gate for side-effecting tools (ADR-0014)
+* timeouts, retries, and normalised typed errors
+* activity logging for every call
 
 ---
 
@@ -350,15 +364,22 @@ Paid APIs or subscriptions should not be required for normal operation.
 
 # Integration Priority
 
-Build in this order:
+Integrations are **not equivalent** in cost, setup difficulty, or value. Build in this
+order (ADR-0010):
 
 ## Version 1
 
-1. Internal database
-2. Calendar
-3. Notion or Obsidian knowledge integration
-4. GitHub integration
-5. File access
+1. **Internal database tools** — tasks, projects, calendar, memory
+2. **GitHub** — read-only (repository tree, file contents, commits, issues). Free API,
+   personal access token, no OAuth app required. Highest value for the Coding Agent.
+   Write access is post-V1 and always requires per-call approval.
+3. **Calendar** — `LocalCalendar` is the default with ICS import/export. Google Calendar
+   is **opt-in** behind the same adapter because it requires a Google Cloud project and
+   OAuth consent, which conflicts with the easy-setup requirement in `docs/13`.
+4. **Knowledge — Obsidian first.** An Obsidian vault is a directory of markdown files:
+   local, free, no API, no auth. Notion is a second implementation of the same adapter
+   and is optional.
+5. **Local files** — read and summarise within explicitly allow-listed directories only.
 
 ---
 
