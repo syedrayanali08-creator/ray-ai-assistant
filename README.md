@@ -6,9 +6,10 @@ already lives in — calendar, GitHub, notes, and local files.
 
 Ray is built for one person, runs locally, and costs nothing to operate.
 
-> **Status: pre-implementation.** The specification in [`/docs`](docs/) is complete and
-> all technical decisions are recorded in [`/docs/adr`](docs/adr/). Phase 1 is next; see
-> the [roadmap](docs/10%20Development%20Roadmap.md).
+> **Status: Phase 1 — foundation.** The database, API, auth, agent registry, voice
+> interfaces, and dashboard shell are in place and talking to each other. Conversation
+> (Phase 2) is next; see the [roadmap](docs/10%20Development%20Roadmap.md). All technical
+> decisions are recorded in [`/docs/adr`](docs/adr/).
 
 ---
 
@@ -77,8 +78,8 @@ and setting `RAY_LLM_PROVIDER=ollama` removes even that.
 
 ## Quickstart
 
-> Available from Phase 1. Documented here so the target setup experience is fixed up
-> front: a new developer must be able to run Ray from this file alone (`docs/13`).
+Prerequisites: Docker, Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 22 with
+pnpm.
 
 ```bash
 git clone https://github.com/syedrayanali08-creator/ray-ai-assistant.git
@@ -91,8 +92,31 @@ docker compose up -d          # PostgreSQL + pgvector
 cd backend && uv sync && uv run alembic upgrade head && uv run python scripts/seed.py
 uv run uvicorn ray.main:app --reload      # http://127.0.0.1:8000
 
-cd ../frontend && pnpm install && pnpm dev # http://localhost:3000
+cd ../frontend && pnpm install
+cp ../.env .env.local                      # the frontend reads the token server-side
+pnpm dev                                   # http://localhost:3000
 ```
+
+Open http://localhost:3000 and the dashboard shows the seeded project, tasks, schedule,
+memories, and agents.
+
+### Development
+
+```bash
+# Backend: lint, types, architecture boundaries, tests
+cd backend
+uv run ruff check . && uv run mypy ray scripts && uv run lint-imports && uv run pytest
+
+# Frontend: regenerate the API types after changing a response shape
+cd frontend && pnpm generate:api && pnpm lint && pnpm typecheck
+
+# Optional: run the same checks on every commit
+pre-commit install
+```
+
+The import boundaries from ADR-0012 (`agents/` may not import `db/`; only `services/`
+touches the database) are checked by `lint-imports` in CI, so the layering cannot rot
+quietly.
 
 ---
 

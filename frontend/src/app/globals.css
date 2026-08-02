@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* The HUD palette: near-black with a single cyan accent. One accent colour keeps
+   the interface readable at a glance — the eye goes to what Ray is doing, not to
+   the chrome (docs/09). */
+@theme {
+  --color-hud-bg: #05070c;
+  --color-hud-panel: #0b111b;
+  --color-hud-border: #16283d;
+  --color-hud-text: #dbe7f3;
+  --color-hud-muted: #6b8299;
+  --color-hud-accent: #35d6ff;
+  --color-hud-warn: #ffb547;
+  --color-hud-danger: #ff5f6d;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", monospace;
+}
+
+html,
+body {
+  background: var(--color-hud-bg);
+  color: var(--color-hud-text);
+}
+
+body {
+  /* A faint grid, far below the content in contrast. Atmosphere should never
+     compete with information. */
+  background-image:
+    radial-gradient(circle at 20% -10%, rgba(53, 214, 255, 0.08), transparent 45%),
+    linear-gradient(rgba(53, 214, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53, 214, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+  min-height: 100vh;
+}
+
+@keyframes hud-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.hud-pulse {
+  animation: hud-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-pulse {
+    animation: none;
+  }
+}

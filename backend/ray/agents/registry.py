@@ -1,0 +1,70 @@
+"""The agent registry.
+
+Agents are code, not database rows (ADR-0005). This module is the single source of
+truth for which agents exist and what each is allowed to touch; the database only
+records whether the user has disabled one and what it did.
+
+Phase 4 gives these entries real implementations. Declaring them now keeps the
+Executive Agent's routing table and the dashboard honest in the meantime.
+"""
+
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class AgentSpec:
+    name: str
+    display_name: str
+    description: str
+    # Tool names this agent may request. The Tool Manager enforces the list; an
+    # agent asking for anything outside it is a bug, not a negotiation.
+    tools: tuple[str, ...] = field(default=())
+
+
+AGENTS: dict[str, AgentSpec] = {
+    "executive": AgentSpec(
+        name="executive",
+        display_name="Executive Agent",
+        description=(
+            "Understands the request, decides which specialist should handle it, and "
+            "composes the final answer in Ray's voice."
+        ),
+        tools=("memory.search",),
+    ),
+    "planning": AgentSpec(
+        name="planning",
+        display_name="Planning Agent",
+        description="Tasks, deadlines, priorities, scheduling, and time blocking.",
+        tools=("tasks.list", "tasks.create", "tasks.update", "calendar.list", "calendar.create"),
+    ),
+    "coding": AgentSpec(
+        name="coding",
+        display_name="Coding Agent",
+        description=(
+            "Project-aware programming help that teaches rather than replacing the user's work."
+        ),
+        tools=("projects.get", "github.read_repo", "github.read_file", "files.read"),
+    ),
+    "learning": AgentSpec(
+        name="learning",
+        display_name="Learning Agent",
+        description="Explains, quizzes, and tracks proficiency per topic.",
+        tools=("learning.get", "learning.update", "memory.search"),
+    ),
+    "research": AgentSpec(
+        name="research",
+        display_name="Research Agent",
+        description="Structured investigation that ends in an actionable plan.",
+        tools=("web.search", "knowledge.search", "files.read"),
+    ),
+}
+
+# The executive routes; it is never a routing target itself.
+ROUTABLE_AGENTS: tuple[str, ...] = tuple(name for name in AGENTS if name != "executive")
+
+
+def get_agent_spec(name: str) -> AgentSpec:
+    try:
+        return AGENTS[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown agent: {name!r}") from exc

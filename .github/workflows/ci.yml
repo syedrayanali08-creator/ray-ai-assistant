@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        # Same image as docker-compose: the tests exercise pgvector columns.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ray
+          POSTGRES_PASSWORD: ray
+          POSTGRES_DB: ray
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ray"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAY_API_TOKEN: test-token
+      RAY_DATABASE_URL: postgresql+asyncpg://ray:ray@localhost:5433/ray_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --all-groups
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Types
+        run: uv run mypy ray scripts
+      - name: Architecture boundaries
+        run: uv run lint-imports
+      - name: Tests
+        run: uv run pytest -q
+      - name: Migrations apply to an empty database
+        env:
+          RAY_DATABASE_URL: postgresql+asyncpg://ray:ray@localhost:5433/ray
+        run: uv run alembic upgrade head
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
