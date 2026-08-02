@@ -22,9 +22,7 @@ class Project(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[ProjectStatus] = mapped_column(default=ProjectStatus.ACTIVE, nullable=False)
-    technology_stack: Mapped[list[str]] = mapped_column(
-        ARRAY(String), default=list, nullable=False
-    )
+    technology_stack: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
     goals: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     progress: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     # Links a project to a repository so the Coding Agent can read it (Phase 5).
