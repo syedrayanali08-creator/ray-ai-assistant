@@ -60,11 +60,17 @@ Ray must protect access to:
 * external integrations
 * API keys
 
-Requirements:
+**V1 (ADR-0006):** a single seeded local user and a static bearer token on every request
+outside `/health`. The backend binds to `127.0.0.1`. There is deliberately no
+registration or login system — hand-rolling one for a single local user would add risk
+without adding protection. Identity resolution lives in one dependency function so real
+authentication can replace it later without touching any other code.
 
-* secure authentication
-* encrypted credentials
-* no hardcoded secrets
+Requirements that still apply in full:
+
+* the API is never unauthenticated, even locally
+* credentials are never hardcoded and never logged
+* the token lives in a git-ignored `.env` and is never exposed to browser JavaScript
 
 ---
 
@@ -75,8 +81,11 @@ Secrets must never be stored directly in code.
 Use:
 
 * environment variables
-* secure configuration files
-* secret managers where available
+* the OS keyring where available
+
+The `integrations` table stores only a **reference** to where a secret lives (an
+environment variable name or a keyring key) — never a secret value. Logs pass through a
+redaction processor so a stack trace can never print a key.
 
 Example:
 
@@ -91,6 +100,36 @@ Incorrect:
 ```
 api_key="123456"
 ```
+
+---
+
+# Side-Effect Approval
+
+**Every tool that changes state requires explicit user approval before it runs
+(ADR-0014).** This is enforced by the Tool Manager, not by the model: a side-effecting
+tool cannot execute without an approval record.
+
+The user is shown the exact payload — "Create event *Coding block*, Tue 19:00–21:00" —
+and approves or rejects it. Read-only tools run freely; requiring consent to read a task
+list would make Ray useless.
+
+Standing approvals ("always allow this tool") are available for low-risk internal tools,
+are listed and revocable in Settings, and are **never** available for tools that write
+outside Ray's own database.
+
+---
+
+# Prompt Injection
+
+Ray reads untrusted content: repository files, notes, and web pages can contain text
+aimed at the model. Countermeasures:
+
+* external content is inserted into prompts inside explicit untrusted-content
+  delimiters and is never treated as instructions
+* credentials are held by the Tool Manager and injected at call time, so they never
+  enter an agent's context and cannot be echoed out
+* because every state change is gated on a human click that displays the real payload,
+  a successful injection still cannot silently alter user data
 
 ---
 
@@ -127,6 +166,23 @@ Ray should:
 * request permission
 * clearly show accessed files
 * avoid unrestricted access
+
+---
+
+# Data Leaving the Machine
+
+Ray must be honest about this.
+
+* **Memory embeddings and the memory corpus never leave the machine** — embeddings are
+  computed locally (ADR-0003).
+* **Conversation text does leave the machine** when a hosted LLM provider is selected
+  (the default is Google's Gemini free tier, ADR-0001). This must be stated in the
+  README and in the Settings UI.
+* Setting `RAY_LLM_PROVIDER=ollama` makes Ray fully local, at some cost in answer
+  quality. This option must always remain available.
+* **Microphone audio never leaves the machine before wake-word activation**, and
+  wake-word detection runs client-side (ADR-0009). While listening is armed, a
+  persistent indicator is shown and can be disabled in one click.
 
 ---
 

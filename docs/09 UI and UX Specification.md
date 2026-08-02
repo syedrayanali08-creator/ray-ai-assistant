@@ -147,7 +147,10 @@ Avoid:
 
 # Voice Interface
 
-Voice should be a major interaction method.
+**Voice is a primary interaction method, not a secondary one (ADR-0009).** The target
+experience is: the user says "Ray", Ray activates, the user speaks, Ray answers aloud.
+The interface is designed around that from the start, even while the underlying voice
+implementation is still improving.
 
 The interface should include:
 
@@ -166,12 +169,17 @@ Allows:
 Examples:
 
 ```
+Idle (wake word armed)
+
 Listening...
 
 Processing...
 
 Responding...
 ```
+
+When wake-word detection is armed the interface must show a persistent, unmistakable
+microphone indicator, and turning it off must always be one click away (`docs/12`).
 
 ---
 
@@ -332,6 +340,10 @@ The interface should work on:
 * tablet
 * mobile in future versions
 
+Stack: Next.js 15 + React 19 + TypeScript, Tailwind CSS v4, shadcn/ui primitives,
+TanStack Query, and Framer Motion used sparingly (ADR-0011). Streaming is consumed from
+the SSE chat endpoint (ADR-0007).
+
 The first version should prioritize desktop because development and usage will primarily occur there.
 
 ---
@@ -362,9 +374,12 @@ Examples:
 * TaskPanel
 * CalendarPanel
 * AgentStatus
-* MemoryCard
+* AgentTrace — renders the executive → agent → tool chain for a response
+* ApprovalCard — shows the exact payload of a side-effecting tool call with
+  Approve / Reject, and an "always allow" option where permitted (ADR-0014)
+* MemoryCard — including provenance ("why does Ray believe this?")
 * ProjectCard
-* VoiceControl
+* VoiceControl — wake-word state, listening state, push-to-talk fallback
 
 Avoid creating duplicate UI logic.
 

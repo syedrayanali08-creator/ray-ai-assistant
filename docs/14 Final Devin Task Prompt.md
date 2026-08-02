@@ -140,13 +140,16 @@ Responsible for:
 
 ## Specialized Agents
 
-Implement modular agents:
+Implement modular agents **as code modules** (ADR-0005):
 
 * Planning Agent
 * Coding Agent
 * Learning Agent
 * Research Agent
-* Memory Agent
+
+Memory is a **service** called on every request, not an agent — routing it through an
+LLM turn would add latency and non-determinism to the hot path. It is additionally
+exposed to agents as a tool (ADR-0005).
 
 ---
 
@@ -154,18 +157,12 @@ Implement modular agents:
 
 Build incrementally.
 
-Recommended order:
+The canonical phase order lives in **`docs/10 Development Roadmap`**. The list
+previously duplicated here has been removed because it conflicted with `docs/10`
+(notably by placing the database after AI conversation, which is impossible —
+conversations must be persisted).
 
-1. Project foundation
-2. Frontend/backend connection
-3. AI conversation
-4. Database
-5. Memory
-6. Agent system
-7. Tasks/projects
-8. Integrations
-9. Voice
-10. UI improvements
+All resolved technical decisions live in **`docs/adr/`** and are binding.
 
 ---
 
@@ -257,13 +254,15 @@ Prioritize usability over unnecessary effects.
 
 # Voice Requirements
 
-Ray should eventually support:
+Ray is **voice-first** (ADR-0009). Wake-word activation using "Ray" is a core identity
+feature, not a future enhancement.
 
-* speech-to-text
-* text-to-speech
-* wake word activation using "Ray"
+The architecture must support the full pipeline from Phase 1 — microphone → wake word →
+speech-to-text → AI → text-to-speech — while the implementation improves
+incrementally: browser fallbacks in Phase 2, local faster-whisper and Piper in Phase 6,
+openWakeWord activation in Phase 6b.
 
-Use free solutions where possible.
+All chosen voice components are free and run locally.
 
 ---
 
