@@ -103,3 +103,14 @@ async def test_task_crud_over_the_api(auth_client: AsyncClient) -> None:
 async def test_updating_a_missing_task_is_404(auth_client: AsyncClient) -> None:
     response = await auth_client.patch(f"/tasks/{uuid.uuid4()}", json={"title": "ghost"})
     assert response.status_code == 404
+
+
+async def test_unknown_project_is_404_not_500(auth_client: AsyncClient) -> None:
+    # A bad project id must not reach the foreign key constraint.
+    ghost = str(uuid.uuid4())
+    created = await auth_client.post("/tasks", json={"title": "orphan", "project_id": ghost})
+    assert created.status_code == 404
+
+    task_id = (await auth_client.post("/tasks", json={"title": "real"})).json()["id"]
+    moved = await auth_client.patch(f"/tasks/{task_id}", json={"project_id": ghost})
+    assert moved.status_code == 404

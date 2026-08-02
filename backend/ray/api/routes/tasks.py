@@ -8,6 +8,7 @@ from ray.domain.enums import TaskStatus
 from ray.schemas import TaskCreate, TaskRead, TaskUpdate
 from ray.security.auth import get_current_user_id
 from ray.services import task_service
+from ray.services.errors import UnknownProjectError
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -36,7 +37,10 @@ async def create_task(
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ) -> TaskRead:
-    return await task_service.create_task(session, user_id, data)
+    try:
+        return await task_service.create_task(session, user_id, data)
+    except UnknownProjectError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.patch("/{task_id}", response_model=TaskRead)
@@ -46,7 +50,10 @@ async def update_task(
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ) -> TaskRead:
-    task = await task_service.update_task(session, user_id, task_id, data)
+    try:
+        task = await task_service.update_task(session, user_id, task_id, data)
+    except UnknownProjectError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     return task
