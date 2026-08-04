@@ -18,7 +18,7 @@ Status is one of `Accepted`, `Superseded by ADR-XXXX`, or `Proposed`.
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-llm-provider-abstraction.md) | LLM provider abstraction with Gemini as the default | Accepted |
+| [0001](0001-llm-provider-abstraction.md) | LLM provider abstraction with Gemini as the default | Accepted (amended by 0015) |
 | [0002](0002-postgres-pgvector.md) | PostgreSQL + pgvector as the single data store | Accepted |
 | [0003](0003-local-embeddings.md) | Local sentence-transformers embeddings | Accepted |
 | [0004](0004-unified-task-model.md) | One unified Task model | Accepted |
@@ -32,3 +32,4 @@ Status is one of `Accepted`, `Superseded by ADR-XXXX`, or `Proposed`.
 | [0012](0012-backend-stack.md) | FastAPI + SQLAlchemy + Alembic backend and tooling | Accepted |
 | [0013](0013-memory-policy.md) | Memory write, dedupe, and retrieval policy | Accepted |
 | [0014](0014-approval-gate.md) | Explicit user approval for side-effecting tool calls | Accepted |
+| [0015](0015-mock-provider-and-graceful-degradation.md) | Mock provider terminates the fallback chain; Groq deferred | Accepted |

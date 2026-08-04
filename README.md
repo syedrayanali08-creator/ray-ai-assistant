@@ -100,6 +100,29 @@ pnpm dev                                   # http://localhost:3000
 Open http://localhost:3000 and the dashboard shows the seeded project, tasks, schedule,
 memories, and agents.
 
+### Choosing a model
+
+Ray runs with **no** model configured — it answers from a labelled `mock` provider that
+tells you what to set (ADR-0015). To get real answers, pick either end of the chain:
+
+```bash
+# Hosted, best quality, free tier. Key from https://aistudio.google.com/apikey
+RAY_GEMINI_API_KEY=…
+
+# Or fully local, nothing leaves the machine:
+#   ollama pull llama3.2
+RAY_LLM_PROVIDER=ollama
+```
+
+The chain is `RAY_LLM_PROVIDER → RAY_LLM_FALLBACK_PROVIDER → mock`, tried in order. A
+rate limit, an outage, a missing key, or a model that has not been pulled moves to the
+next link and records the degradation in the response trace, so a failing provider
+degrades Ray rather than breaking it. `GET /chat/providers` shows the resolved chain and
+why anything in it is unusable.
+
+Adding a provider is one file in `backend/ray/llm/providers/` plus an environment
+variable; `lint-imports` enforces that no vendor SDK is imported outside `ray/llm/`.
+
 ### Development
 
 ```bash

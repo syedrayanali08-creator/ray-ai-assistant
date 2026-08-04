@@ -35,7 +35,9 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.12
-      - run: uv sync --all-groups
+      # Not --all-groups: the `embeddings` group pulls torch, which Phase 3 needs
+      # and CI does not.
+      - run: uv sync --group dev
       - name: Lint
         run: uv run ruff check .
       - name: Format

@@ -135,6 +135,41 @@ class MessageRead(ORMModel):
     created_at: datetime
 
 
+class ChatRequest(BaseModel):
+    """One turn. Modality is part of the request because a spoken answer is a
+    different answer, not a different renderer (ADR-0009)."""
+
+    message: str = Field(min_length=1, max_length=10_000)
+    conversation_id: uuid.UUID | None = None
+    input_modality: Modality = Modality.TEXT
+    output_modality: Modality = Modality.TEXT
+    project_id: uuid.UUID | None = None
+
+
+class ConversationSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    message_count: int
+    created_at: datetime
+    last_message_at: datetime | None
+
+
+class ConversationRead(BaseModel):
+    id: uuid.UUID
+    title: str
+    created_at: datetime
+    messages: list[MessageRead]
+
+
+class ProviderStatus(BaseModel):
+    """One link in the provider chain, and why it is or is not usable."""
+
+    name: str
+    model: str
+    configured: bool
+    detail: str = ""
+
+
 class AgentRead(BaseModel):
     """An entry in the code-side agent registry, plus its runtime state."""
 

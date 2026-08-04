@@ -7,9 +7,10 @@ import structlog
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ray.api.routes import agents, dashboard, health, projects, tasks, user
+from ray.api.routes import agents, chat, dashboard, health, projects, tasks, user
 from ray.config import get_settings
 from ray.db.session import dispose_engine
+from ray.llm.registry import dispose_registry, get_registry
 from ray.security.auth import verify_token
 
 log = structlog.get_logger()
@@ -18,8 +19,15 @@ log = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    log.info("ray.startup", env=settings.env, llm_provider=settings.llm_provider)
+    # Log the resolved chain, not just the preference: "gemini" in the config and
+    # no key set is a very different runtime state.
+    chain = [
+        f"{info.name}{'' if info.configured else ' (unconfigured)'}"
+        for info in get_registry().describe()
+    ]
+    log.info("ray.startup", env=settings.env, llm_chain=chain)
     yield
+    await dispose_registry()
     await dispose_engine()
 
 
@@ -56,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(projects.router, dependencies=protected)
     app.include_router(tasks.router, dependencies=protected)
     app.include_router(agents.router, dependencies=protected)
+    app.include_router(chat.router, dependencies=protected)
 
     return app
 

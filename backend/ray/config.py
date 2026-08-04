@@ -32,11 +32,24 @@ class Settings(BaseSettings):
     user_email: str | None = None
     user_timezone: str = "UTC"
 
-    # LLM provider selection (ADR-0001). Adapters arrive in Phase 2; the settings
-    # exist now so the contract is fixed and nothing hardcodes a provider later.
-    llm_provider: Literal["gemini", "groq", "ollama"] = "gemini"
-    llm_router_provider: Literal["gemini", "groq", "ollama"] | None = None
-    llm_fallback_provider: Literal["gemini", "groq", "ollama"] | None = None
+    # LLM provider selection (ADR-0001, ADR-0015). "mock" is always appended to the
+    # chain, so Ray answers even with nothing configured.
+    llm_provider: Literal["gemini", "ollama", "mock"] = "gemini"
+    llm_router_provider: Literal["gemini", "ollama", "mock"] | None = None
+    llm_fallback_provider: Literal["gemini", "ollama", "mock"] | None = "ollama"
+
+    # Provider credentials and models. The key is a secret: it is read from the
+    # environment, never logged, and never written to the database.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-flash-latest"
+    ollama_host: str = "http://127.0.0.1:11434"
+    ollama_model: str = "llama3.2"
+    # Slows the mock stream so streaming is visible during development.
+    mock_stream_delay_seconds: float = 0.0
+
+    # Conversation shaping.
+    llm_temperature: float = 0.7
+    history_window: int = 20
 
     # Local embeddings (ADR-0003). The dimension must match the vector column.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
