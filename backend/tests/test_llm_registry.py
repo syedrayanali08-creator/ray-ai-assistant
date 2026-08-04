@@ -117,6 +117,7 @@ async def test_mock_provider_streams_in_fragments() -> None:
     assert chunks[-1].is_final
     assert "hi" in "".join(c.text for c in chunks)
 
+
 async def test_describe_never_returns_the_credential() -> None:
     """A leaked key would leak to the browser: `/chat/providers` is client-visible."""
     sentinel = "sk-do-not-leak-me"
