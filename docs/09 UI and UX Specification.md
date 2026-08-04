@@ -73,6 +73,24 @@ Features:
 * markdown support
 * code formatting
 
+### As implemented in Phase 2
+
+* Tokens render as they arrive, with a caret while the turn is open. Markdown is
+  parsed **incrementally**, so an unterminated code fence renders as code rather
+  than as backticks that reflow when the fence closes.
+* Markdown is rendered by a small in-house parser covering fenced code, inline
+  code, bold, headings, and lists. It never emits raw HTML, so there is no
+  injection surface to sanitise. Swap in a full parser when Ray needs tables.
+* Auto-scroll follows the stream **only when the user is already at the bottom**;
+  scrolling up to read must not be fought by every token.
+* Voice and text converge on one `send`, differing only in modality, so a spoken
+  turn and a typed turn are the same turn to everything downstream.
+* Failure is a rendered state, never a blank screen: an unreachable backend, a
+  mismatched token, and a mid-stream provider error each have their own message,
+  and a retryable error offers a retry.
+* `+ New` starts a fresh conversation; omitting `conversation_id` is what makes
+  it new, so no separate endpoint is needed.
+
 ---
 
 ## Ray Status Area
@@ -180,6 +198,31 @@ Responding...
 
 When wake-word detection is armed the interface must show a persistent, unmistakable
 microphone indicator, and turning it off must always be one click away (`docs/12`).
+
+The states are the pipeline's real states, not animation names:
+
+```
+idle → armed → listening → thinking → speaking → armed
+```
+
+`thinking` is driven by the request, not the microphone, so the indicator stays
+truthful while the model is being waited on. Phase 2 fills these states with the
+browser speech APIs behind one hook; replacing them with faster-whisper, Piper, and
+openWakeWord changes nothing above the hook (ADR-0009).
+
+Two constraints that are easy to get wrong:
+
+* **Arming requires a user gesture.** Browsers only grant microphone permission from
+  one, so Ray can never auto-arm on load even when the backend reports the wake word as
+  enabled — that setting only makes the affordance primary.
+* **The active STT backend must be named in the UI**, not implied by a microphone icon.
+  `browser` recognition sends audio to Google (`docs/12`); a user who thinks "in the
+  browser" means "on my machine" has been misled by the interface.
+
+Push-to-talk is a peer of the wake word, not a fallback for broken wake-word detection:
+it is the right input when speaking a long request or when the wake word would be
+disruptive. Spoken replies are opt-in and off by default, and they speak `speech_text` —
+a variant written to be *said*, not the markdown with the syntax stripped out.
 
 ---
 
@@ -379,7 +422,8 @@ Examples:
   Approve / Reject, and an "always allow" option where permitted (ADR-0014)
 * MemoryCard — including provenance ("why does Ray believe this?")
 * ProjectCard
-* VoiceControl — wake-word state, listening state, push-to-talk fallback
+* VoiceControl — wake-word state, listening state, push-to-talk, spoken-reply toggle,
+  and the name of the active STT backend
 
 Avoid creating duplicate UI logic.
 

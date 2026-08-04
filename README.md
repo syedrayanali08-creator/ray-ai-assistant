@@ -123,6 +123,30 @@ why anything in it is unusable.
 Adding a provider is one file in `backend/ray/llm/providers/` plus an environment
 variable; `lint-imports` enforces that no vendor SDK is imported outside `ray/llm/`.
 
+### Talking to Ray
+
+Type in the composer, or use voice: **⏺ push-to-talk** for one request, or arm the wake
+word and say *"Ray, …"*. Spoken replies are off by default (🔇) because they should be a
+choice, and when on, Ray speaks a variant of the answer written to be *heard* — no code
+blocks, no markdown.
+
+Voice needs a Chromium-based browser and a microphone permission granted from a click;
+`browser` speech recognition sends the audio to Google, which is why the control names
+the active backend (`docs/12`). Everything works without a microphone — voice is an
+input, not a requirement.
+
+Under each answer, the collapsed trace line shows what actually happened: which agent
+answered, which provider was used, how many memories were retrieved, and whether a
+fallback kicked in. Every line is recorded by the code that ran the step, so it cannot
+be a story the model told.
+
+Streaming can also be watched from the terminal:
+
+```bash
+curl -N -H "Authorization: Bearer $RAY_API_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"message":"Hello"}' http://127.0.0.1:8000/chat/message
+```
+
 ### Development
 
 ```bash
@@ -131,7 +155,7 @@ cd backend
 uv run ruff check . && uv run mypy ray scripts && uv run lint-imports && uv run pytest
 
 # Frontend: regenerate the API types after changing a response shape
-cd frontend && pnpm generate:api && pnpm lint && pnpm typecheck
+cd frontend && pnpm generate:api && pnpm lint && pnpm typecheck && pnpm test
 
 # Optional: run the same checks on every commit
 pre-commit install
