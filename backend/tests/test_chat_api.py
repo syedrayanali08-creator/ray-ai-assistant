@@ -135,8 +135,13 @@ async def test_deleting_a_conversation_removes_its_messages(chat_client: AsyncCl
 
 async def test_provider_status_lists_the_chain(chat_client: AsyncClient) -> None:
     providers = (await chat_client.get("/chat/providers")).json()
-    assert providers[-1]["name"] == "mock"
-    assert all("api_key" not in json.dumps(p).lower() or p["configured"] for p in providers)
+
+    assert providers[-1]["name"] == "mock", "mock always terminates the chain (ADR-0015)"
+    assert all({"name", "model", "configured", "detail"} <= set(p) for p in providers)
+    # An unconfigured provider explains itself by naming the variable to set, which
+    # is the whole point of the endpoint.
+    unconfigured = [p for p in providers if not p["configured"]]
+    assert all(p["detail"] for p in unconfigured)
 
 
 @pytest.mark.parametrize(

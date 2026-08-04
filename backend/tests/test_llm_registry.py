@@ -1,5 +1,8 @@
 """Provider selection and degradation (ADR-0001)."""
 
+import json
+from dataclasses import asdict
+
 import pytest
 
 from ray.config import Settings
@@ -113,3 +116,13 @@ async def test_mock_provider_streams_in_fragments() -> None:
     assert len([c for c in chunks if c.text]) > 1
     assert chunks[-1].is_final
     assert "hi" in "".join(c.text for c in chunks)
+
+async def test_describe_never_returns_the_credential() -> None:
+    """A leaked key would leak to the browser: `/chat/providers` is client-visible."""
+    sentinel = "sk-do-not-leak-me"
+    registry = ProviderRegistry(_settings(gemini_api_key=sentinel))
+
+    blob = json.dumps([asdict(info) for info in registry.describe()])
+
+    assert sentinel not in blob
+    assert "gemini" in blob
