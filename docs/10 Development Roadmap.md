@@ -87,10 +87,15 @@ Create the main Ray interaction system.
 
 ## Tasks
 
-* `LLMProvider` abstraction with the Gemini, Groq, and Ollama adapters (ADR-0001)
+* `LLMProvider` abstraction with the Gemini and Ollama adapters, plus a `mock` provider
+  that terminates the fallback chain (ADR-0001, ADR-0015). Groq is deferred to the phase
+  that introduces routing, since nothing routes yet.
 * Executive Agent in single-agent mode (no routing yet)
 * `POST /chat/message` streaming over SSE (ADR-0007)
 * Conversation and message persistence, conversation history
+* Retrieval and embedding *interfaces* only — `NullRetriever` returns nothing and the
+  `memory` trace event is emitted with `count: 0`, so Phase 3 is a swap rather than a
+  change to the pipeline
 * Chat UI with markdown, code formatting, and streaming rendering
 * **Voice round trip using browser STT/TTS fallbacks** — low quality, but Ray can be
   spoken to and can speak back
@@ -102,6 +107,8 @@ User can:
 * open Ray, type or speak a message, and receive a streamed response
 * continue and revisit conversations
 * switch LLM provider with one environment variable
+* run Ray with **nothing** configured and still get an answer that explains what to
+  configure
 
 ---
 
@@ -291,3 +298,62 @@ Ray V1 is complete when:
 * Ray explains which agent, tool, and memories it used
 * Ray has a polished Jarvis-inspired dashboard
 * Ray runs locally with no paid services
+
+---
+
+# Beyond the Roadmap — Directions, Not Commitments
+
+Recorded so they shape the architecture now and are not lost. None of these are
+scheduled, and nothing below should be implemented until it is promoted into a phase
+above.
+
+## Two wake words: "Ray" and "Jarvis"
+
+Both names should activate Ray. This is a deliberate design note rather than a
+nice-to-have, because it constrains the wake-word interface: `WakeEvent` must carry
+*which* phrase fired, and the detector must accept a **list** of keywords rather than
+one. openWakeWord supports multiple simultaneous models, so the cost is a second model
+file, not a second pipeline. The spoken persona stays "Ray"; "Jarvis" is an alias, not
+a second assistant.
+
+## Cinematic reactor-inspired HUD
+
+The interface should evolve toward the Iron Man arc-reactor aesthetic: a circular,
+concentric-ring centrepiece that visibly *reacts* — idle breathing, a listening pulse on
+wake, an inward gather while thinking, an outward bloom while speaking. Ambient depth
+(scan lines, subtle glow, angular chrome) around a calm core.
+
+The constraint is that it must stay clean and usable. Two rules follow, and they are the
+whole point of writing this down early:
+
+* **Motion is state, not decoration.** Every animation maps to a real system state that
+  already exists in the trace stream (idle, listening, thinking, tool call awaiting
+  approval, speaking). If a viewer cannot name what an animation means, it should not
+  ship.
+* **Text stays flat and readable.** The cinema lives in the ambient layer and the
+  reactor; conversation, code blocks, and task lists remain high-contrast and
+  unornamented. A HUD that is hard to read is a worse HUD.
+
+`prefers-reduced-motion` must be honoured, and the reactor must degrade to a static
+state indicator without losing information.
+
+## Further specialized agents
+
+The agent registry is code (ADR-0005), so a new domain is a new module plus a prompt.
+Candidate domains, in no order:
+
+* **Fitness** — workout programmes, progression tracking, recovery and sleep patterns.
+* **Content creation** — drafting, editing, repurposing one piece across formats,
+  maintaining a consistent voice.
+* **Personal finance** — budgets, subscriptions, savings goals. This one needs care:
+  financial data is the most sensitive category Ray would hold, and it likely argues for
+  a local-only provider (ADR-0015) and a stricter memory policy (ADR-0013).
+* **Health and habits, travel planning, home/inventory** — plausible, unscoped.
+
+Two things must be true before any of them is worth building:
+
+1. **Routing exists and is good.** More agents make bad routing worse, not better; a
+   fitness agent is useless if a fitness question reaches the coding agent.
+2. **The domain needs its own tools or memory shape.** If an agent is only a different
+   system prompt, it should be a prompt, not an agent. Splitting on personality rather
+   than capability is how agent systems become unmaintainable.

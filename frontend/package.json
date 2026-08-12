@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "generate:api": "cd ../backend && uv run python scripts/export_openapi.py ../frontend/openapi.json && cd ../frontend && openapi-typescript openapi.json -o src/lib/api-types.ts"
+    "generate:api": "cd ../backend && uv run python scripts/export_openapi.py ../frontend/openapi.json && cd ../frontend && openapi-typescript openapi.json -o src/lib/api-types.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "clsx": "2.1.1",
@@ -18,8 +19,9 @@
     "tailwind-merge": "2.6.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "3.2.0",
     "@tailwindcss/postcss": "4.1.11",
-    "@types/node": "22.10.2",
+    "@types/node": "22.12.0",
     "@types/react": "19.0.2",
     "@types/react-dom": "19.0.2",
     "eslint": "9.17.0",
@@ -27,7 +29,7 @@
     "openapi-typescript": "7.4.4",
     "tailwindcss": "4.1.11",
     "typescript": "5.7.2",
-    "@eslint/eslintrc": "3.2.0"
+    "vitest": "3.2.4"
   },
   "packageManager": "pnpm@9.15.0"
 }

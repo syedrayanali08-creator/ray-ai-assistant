@@ -1,45 +1,91 @@
-import type { Health } from "@/lib/api";
+"use client";
 
+import { useCallback, useEffect, useRef } from "react";
+
+import { Composer } from "@/components/composer";
+import { MessageList } from "@/components/message-list";
 import { VoiceControl } from "@/components/voice-control";
+import { useChat } from "@/hooks/use-chat";
+import { useVoice } from "@/hooks/use-voice";
+import type { Health, RestoredConversation } from "@/lib/api";
 
 /**
- * The conversation surface.
+ * The conversation surface: the whole loop in one place.
  *
- * Phase 2 replaces the placeholder body with the SSE-streamed message list; the
- * composer and voice control below it are already in their final positions, so
- * that change is additive.
+ *   wake word or typing → POST /api/chat → SSE tokens → trace → optional speech
+ *
+ * Voice and text converge on the same `send`, so a spoken turn and a typed turn
+ * are the same turn to everything downstream. The only difference is the
+ * modality, which the backend uses to shape the prompt (ADR-0009).
  */
-export function Conversation({ health, userName }: { health: Health | null; userName: string }) {
+export function Conversation({
+  health,
+  userName,
+  restored,
+}: {
+  health: Health | null;
+  userName: string;
+  /** The conversation Ray was last having, fetched on the server. */
+  restored: RestoredConversation | null;
+}) {
+  const chat = useChat(restored ?? undefined);
+
+  const send = useCallback(
+    (message: string, spoken = false) => {
+      void chat.send(message, spoken ? "voice" : "text");
+    },
+    [chat],
+  );
+
+  const voice = useVoice({
+    onRequest: (text) => send(text, true),
+    wakeWordEnabled: health?.voice?.wake_word_enabled ?? false,
+  });
+
+  // The voice indicator tracks the request, not just the microphone.
+  useEffect(() => {
+    voice.setThinking(chat.sending);
+  }, [chat.sending, voice.setThinking, voice]);
+
+  // Speak each answer once, using the spoken variant rather than the markdown.
+  const spokenIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const completed = chat.lastCompleted;
+    if (completed === null || spokenIdRef.current === completed.id) return;
+    spokenIdRef.current = completed.id;
+    voice.speak(completed.speechText ?? completed.content);
+  }, [chat.lastCompleted, voice]);
+
+  const provider = health?.llm_provider ?? "offline";
+
   return (
     <section className="flex min-h-0 flex-1 flex-col rounded-lg border border-hud-border bg-hud-panel/60">
-      <header className="flex items-center justify-between border-b border-hud-border px-5 py-3">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-hud-muted">
-          Conversation
-        </h2>
-        <VoiceControl capabilities={health?.voice ?? null} />
+      <header className="flex items-center justify-between gap-3 border-b border-hud-border px-5 py-3">
+        <div className="flex items-center gap-3">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-hud-muted">
+            Conversation
+          </h2>
+          {chat.messages.length > 0 && (
+            <button
+              type="button"
+              onClick={chat.reset}
+              className="font-mono text-[10px] uppercase tracking-widest text-hud-muted transition-colors hover:text-hud-accent"
+            >
+              + New
+            </button>
+          )}
+        </div>
+        <VoiceControl capabilities={health?.voice ?? null} voice={voice} />
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
-        <p className="text-2xl font-light text-hud-text">Good to see you, {userName}.</p>
-        <p className="max-w-md text-sm text-hud-muted">
-          Conversation arrives in Phase 2, streamed over SSE with the agent trace shown as it
-          happens. The foundation below is live: this dashboard is reading real data from the API.
-        </p>
-      </div>
+      <MessageList messages={chat.messages} userName={userName} onRetry={chat.retry} />
 
-      <div className="border-t border-hud-border p-4">
-        <div className="flex items-center gap-3 rounded-md border border-hud-border bg-hud-bg/60 px-4 py-3">
-          <input
-            disabled
-            placeholder="Ask Ray anything… (Phase 2)"
-            aria-label="Message Ray"
-            className="flex-1 bg-transparent text-sm text-hud-text outline-none placeholder:text-hud-muted disabled:cursor-not-allowed"
-          />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-hud-muted">
-            {health?.llm_provider ?? "offline"}
-          </span>
-        </div>
-      </div>
+      <Composer
+        onSend={send}
+        disabled={chat.sending}
+        transcript={voice.transcript}
+        providerLabel={provider}
+      />
     </section>
   );
 }

@@ -14,9 +14,19 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "structlog>=24.4.0",
     "python-dotenv>=1.0.1",
+    "httpx>=0.28.0",
+    # Pinned below the newest release: a version published days ago has not been
+    # vetted, and provider SDKs are a supply-chain surface.
+    "google-genai>=2.14.0,<2.15.0",
 ]
 
 [dependency-groups]
+# Local embeddings pull in torch (~2 GB), which Phase 3 needs and Phase 2 does not.
+# Kept out of the default install so CI and cold starts stay fast:
+#   uv sync --group embeddings
+embeddings = [
+    "sentence-transformers>=3.3.0",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
@@ -48,6 +58,11 @@ plugins = ["pydantic.mypy"]
 module = ["pgvector.*"]
 ignore_missing_imports = true
 
+# Optional install (see the `embeddings` group); absent in the default environment.
+[[tool.mypy.overrides]]
+module = ["sentence_transformers.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 # One event loop for the whole run: the engine and its connection pool are created
@@ -59,6 +74,8 @@ testpaths = ["tests"]
 # Architectural boundaries from ADR-0012, enforced rather than merely documented.
 [tool.importlinter]
 root_package = "ray"
+# Required so a contract can forbid a third-party package, not just our own.
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Agents never reach the database or external services directly"
@@ -73,6 +90,15 @@ source_modules = ["ray.api", "ray.core", "ray.tools", "ray.llm"]
 forbidden_modules = ["ray.db.models"]
 # Reaching the database *through* a service is the intended path; what is banned
 # is importing a model directly.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Vendor model SDKs stay inside ray.llm"
+type = "forbidden"
+source_modules = ["ray.agents", "ray.api", "ray.core", "ray.services", "ray.memory"]
+forbidden_modules = ["google", "httpx"]
+# Going *through* ray.llm is the whole point; what is banned is calling a vendor
+# SDK or speaking HTTP to a model from outside the adapter layer (ADR-0001).
 allow_indirect_imports = true
 
 [build-system]

@@ -183,6 +183,21 @@ Ray must be honest about this.
 * **Microphone audio never leaves the machine before wake-word activation**, and
   wake-word detection runs client-side (ADR-0009). While listening is armed, a
   persistent indicator is shown and can be disabled in one click.
+* **The browser speech backends are a hosted service in disguise.** `RAY_STT_BACKEND=browser`
+  uses the Web Speech API, and in Chrome that streams the captured audio to Google for
+  transcription — the audio leaves the machine even though the code runs in the browser.
+  Speech *synthesis* is local in current browsers, but is not guaranteed to be. This is
+  acceptable as the Phase 2 default because it needs no setup, and it is why
+  `RAY_STT_BACKEND=local` (faster-whisper) remains on the roadmap. The UI must say which
+  backend is active rather than only showing a microphone icon.
+* **The API token stays server-side.** The browser talks to a Next.js route handler,
+  which adds the bearer token; `RAY_API_TOKEN` is never sent to the client or exposed in
+  a client bundle. Only variables intentionally prefixed for client use may be read from
+  browser code.
+* **A provider key is never logged, persisted, or returned by the API.**
+  `GET /chat/providers` reports whether a provider is configured and why not — never the
+  credential. `.env` is gitignored, and the key is read through settings only
+  (ADR-0015).
 
 ---
 

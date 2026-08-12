@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted.
+Accepted. Amended by [ADR-0015](0015-mock-provider-and-graceful-degradation.md), which
+adds a `mock` provider as the final link in the fallback chain and defers the Groq
+adapter to the phase that introduces routing.
 
 ## Context
 
