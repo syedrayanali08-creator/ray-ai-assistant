@@ -1,13 +1,23 @@
 import { Conversation } from "@/components/conversation";
 import { AgentPanel, MemoryPanel, ProjectPanel, SchedulePanel, TaskPanel } from "@/components/panels";
 import { StatusBar } from "@/components/status-bar";
-import { getDashboard, getHealth, type DashboardSummary, type Health } from "@/lib/api";
+import {
+  getDashboard,
+  getHealth,
+  getRecentConversation,
+  type DashboardSummary,
+  type Health,
+} from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  // Both requests are independent, so they overlap rather than queue.
-  const [health, dashboard] = await Promise.all([getHealth(), safeDashboard()]);
+  // All three requests are independent, so they overlap rather than queue.
+  const [health, dashboard, conversation] = await Promise.all([
+    getHealth(),
+    safeDashboard(),
+    getRecentConversation(),
+  ]);
 
   if (dashboard === null) {
     return <BackendUnavailable health={health} />;
@@ -18,7 +28,11 @@ export default async function DashboardPage() {
       <StatusBar health={health} user={dashboard.user} />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
-        <Conversation health={health} userName={dashboard.user?.name ?? "there"} />
+        <Conversation
+          health={health}
+          userName={dashboard.user?.name ?? "there"}
+          restored={conversation}
+        />
 
         {/* The panel rail: everything Ray knows, always visible (docs/09). */}
         <aside className="grid min-h-0 grid-rows-[1.2fr_0.8fr_0.8fr_1.2fr_0.8fr] gap-4 overflow-y-auto">

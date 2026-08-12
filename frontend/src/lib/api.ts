@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { ChatMessage, TraceEntry } from "@/hooks/use-chat";
 import type { components } from "@/lib/api-types";
 
 /**
@@ -49,10 +50,72 @@ export type Agent = Schemas["AgentRead"];
 export type DashboardSummary = Schemas["DashboardSummary"];
 export type VoiceCapabilities = Schemas["VoiceCapabilities"];
 export type Health = Schemas["HealthResponse"];
+export type ConversationSummary = Schemas["ConversationSummary"];
+export type Conversation = Schemas["ConversationRead"];
 export type TaskStatus = Task["status"];
 export type TaskPriority = Task["priority"];
 
 export const getDashboard = () => request<DashboardSummary>("/dashboard");
+
+/**
+ * The conversation Ray was last having, restored on load.
+ *
+ * Conversations are persisted server-side, so starting empty after a reload would
+ * be throwing away state that exists — "continue and revisit conversations" is a
+ * Phase 2 requirement (`docs/10`). The most recent one is enough: a full
+ * conversation switcher is a later phase.
+ *
+ * Never throws, for the same reason as `getHealth`.
+ */
+export async function getRecentConversation(): Promise<RestoredConversation | null> {
+  try {
+    const history = await request<ConversationSummary[]>("/chat/history");
+    const latest = history[0];
+    if (latest === undefined) return null;
+
+    const conversation = await request<Conversation>(`/chat/${latest.id}`);
+    return {
+      conversationId: conversation.id,
+      messages: conversation.messages.map(toChatMessage),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface RestoredConversation {
+  conversationId: string;
+  messages: ChatMessage[];
+}
+
+/**
+ * A persisted message becomes the same shape the live stream produces, so the UI
+ * cannot tell a restored turn from a streamed one.
+ */
+function toChatMessage(message: Schemas["MessageRead"]): ChatMessage {
+  return {
+    id: message.id,
+    role: message.role === "user" ? "user" : "assistant",
+    content: message.content,
+    speechText: message.speech_text ?? undefined,
+    agentName: message.agent_name ?? undefined,
+    trace: readTrace(message.trace),
+  };
+}
+
+/** The stored trace is `{"events": [{"stage": …, …detail}]}` (see the orchestrator). */
+function readTrace(trace: Schemas["MessageRead"]["trace"]): TraceEntry[] {
+  if (trace === null || trace === undefined) return [];
+  const events = (trace as { events?: unknown }).events;
+  if (!Array.isArray(events)) return [];
+
+  return events.flatMap((event): TraceEntry[] => {
+    if (typeof event !== "object" || event === null) return [];
+    const { stage, ...detail } = event as { stage?: unknown };
+    if (typeof stage !== "string") return [];
+    return [{ stage: stage as TraceEntry["stage"], detail: detail as Record<string, unknown> }];
+  });
+}
 
 /**
  * Health never throws: a dead backend is a state the HUD renders, not a crash.

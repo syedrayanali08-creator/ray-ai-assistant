@@ -108,9 +108,15 @@ export function useVoice({
   const requestRef = useRef(onRequest);
   requestRef.current = onRequest;
 
-  const supported = useMemo(() => recognitionConstructor() !== null, []);
-  const speechSupported =
-    typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined";
+  // Capability is browser-only, so it cannot be read during render: the server
+  // renders "unsupported" and the client would disagree, which is a hydration
+  // mismatch. It resolves in an effect, after hydration.
+  const [supported, setSupported] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  useEffect(() => {
+    setSupported(recognitionConstructor() !== null);
+    setSpeechSupported(typeof window.speechSynthesis !== "undefined");
+  }, []);
 
   const stop = useCallback(() => {
     armedRef.current = false;
@@ -252,10 +258,10 @@ export function useVoice({
 
   const toggleSpeech = useCallback(() => {
     setSpeechEnabled((enabled) => {
-      if (enabled && speechSupported) window.speechSynthesis.cancel();
+      if (enabled) window.speechSynthesis.cancel();
       return !enabled;
     });
-  }, [speechSupported]);
+  }, []);
 
   // Arming needs a user gesture for microphone permission, so a backend that
   // reports wake word enabled cannot auto-arm; it only makes the affordance the

@@ -7,7 +7,7 @@ import { MessageList } from "@/components/message-list";
 import { VoiceControl } from "@/components/voice-control";
 import { useChat } from "@/hooks/use-chat";
 import { useVoice } from "@/hooks/use-voice";
-import type { Health } from "@/lib/api";
+import type { Health, RestoredConversation } from "@/lib/api";
 
 /**
  * The conversation surface: the whole loop in one place.
@@ -21,16 +21,17 @@ import type { Health } from "@/lib/api";
 export function Conversation({
   health,
   userName,
+  restored,
 }: {
   health: Health | null;
   userName: string;
+  /** The conversation Ray was last having, fetched on the server. */
+  restored: RestoredConversation | null;
 }) {
-  const chat = useChat();
-  const lastSentRef = useRef("");
+  const chat = useChat(restored ?? undefined);
 
   const send = useCallback(
     (message: string, spoken = false) => {
-      lastSentRef.current = message;
       void chat.send(message, spoken ? "voice" : "text");
     },
     [chat],
@@ -77,11 +78,7 @@ export function Conversation({
         <VoiceControl capabilities={health?.voice ?? null} voice={voice} />
       </header>
 
-      <MessageList
-        messages={chat.messages}
-        userName={userName}
-        onRetry={() => send(lastSentRef.current)}
-      />
+      <MessageList messages={chat.messages} userName={userName} onRetry={chat.retry} />
 
       <Composer
         onSend={send}
