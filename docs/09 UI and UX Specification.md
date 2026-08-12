@@ -90,6 +90,15 @@ Features:
   and a retryable error offers a retry.
 * `+ New` starts a fresh conversation; omitting `conversation_id` is what makes
   it new, so no separate endpoint is needed.
+* Retrying a failed turn **replaces** it rather than stacking an identical question
+  above it, and every turn carries a unique id so a slow or superseded stream cannot
+  write into the turn after it.
+* The most recent conversation is restored on load, fetched on the server, so a
+  reload continues where Ray left off. Browsing *older* conversations needs a
+  switcher, which is a later phase; `GET /chat/history` already backs it.
+* Browser capability (speech recognition, speech synthesis) is detected **after**
+  hydration, never during render: the server cannot know it, and disagreeing with the
+  client is a hydration mismatch.
 
 ---
 
