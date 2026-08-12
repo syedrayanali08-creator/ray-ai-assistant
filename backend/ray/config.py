@@ -51,9 +51,24 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.7
     history_window: int = 20
 
-    # Local embeddings (ADR-0003). The dimension must match the vector column.
+    # Local embeddings (ADR-0003). The dimension must match the vector column, so
+    # changing it means a migration, not just a restart.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dim: int = 384
+    # "hashing" needs no torch install and no download (ADR-0016). The
+    # sentence-transformer backend falls back to it rather than failing.
+    embedding_backend: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
+
+    # Memory (ADR-0013).
+    memory_enabled: bool = True
+    # Extraction costs one cheap model call per exchange, off the response path.
+    memory_extraction_enabled: bool = True
+    memory_top_k: int = 5
+    # A weak match is worse than no match: it spends context and invites the model
+    # to use an irrelevant fact.
+    memory_min_score: float = 0.35
+    # Roughly 25% of a small context window, in characters (ADR-0013).
+    memory_context_chars: int = 2_000
 
     # Voice (ADR-0009). Browser backends work with zero setup; local backends
     # (faster-whisper, Piper) land in Phase 6.

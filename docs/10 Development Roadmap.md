@@ -120,12 +120,15 @@ Give Ray persistent knowledge that measurably changes its answers.
 
 ## Tasks
 
-* Local embeddings (ADR-0003) and the `memories` table with an HNSW index
-* Write path: extraction, importance scoring, dedupe and merge (ADR-0013)
-* Retrieval: hybrid similarity + importance + recency + usage scoring
-* Context assembly with a token budget
+* Local embeddings (ADR-0003) and the `memories` table with an HNSW index, with a
+  dependency-free hashing backend so CI exercises real similarity without torch
+  (ADR-0016)
+* Write path: extraction, importance scoring, dedupe and merge (ADR-0013), running
+  **after** the response is streamed so learning never adds latency
+* Retrieval: hybrid similarity + importance + recency + usage scoring, ranked in SQL
+* Context assembly with a token budget, dropping whole memories rather than truncating
 * Memory API and Memory view: search, edit, delete, disable categories, view provenance
-* `docs/15` evaluation set covering memory behaviour
+* `docs/15` evaluation set covering memory behaviour, run through the real pipeline
 
 ## Completion Criteria
 

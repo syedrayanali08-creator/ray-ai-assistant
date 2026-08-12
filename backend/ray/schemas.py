@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ray.domain.enums import (
     EventSource,
     MemoryCategory,
+    MemorySource,
     Modality,
     ProjectStatus,
     TaskPriority,
@@ -121,7 +122,51 @@ class MemoryRead(ORMModel):
     why: str
     hit_count: int
     project_id: uuid.UUID | None
+    source: MemorySource
+    source_message_id: uuid.UUID | None
+    last_used_at: datetime | None
     created_at: datetime
+    updated_at: datetime
+
+
+class MemoryScored(BaseModel):
+    """A retrieval result with the numbers behind it, so a surprising memory can be
+    explained rather than guessed at."""
+
+    memory: MemoryRead
+    similarity: float
+    score: float
+
+
+class MemoryCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=4_000)
+    category: MemoryCategory = MemoryCategory.USER
+    importance: int = Field(default=3, ge=1, le=5)
+    why: str = ""
+    project_id: uuid.UUID | None = None
+
+
+class MemoryUpdate(BaseModel):
+    content: str | None = Field(default=None, min_length=1, max_length=4_000)
+    category: MemoryCategory | None = None
+    importance: int | None = Field(default=None, ge=1, le=5)
+    why: str | None = None
+
+
+class MemoryStats(BaseModel):
+    total: int
+    by_category: dict[str, int]
+    superseded: int
+    """Merged predecessors, kept for auditing (ADR-0013)."""
+    unembedded: int
+    """Live memories with no vector: invisible to retrieval until re-embedded."""
+    disabled_categories: list[MemoryCategory]
+
+
+class MemoryCategorySettings(BaseModel):
+    """Which categories the user has switched off. Everything else is on."""
+
+    disabled_categories: list[MemoryCategory] = Field(default_factory=list)
 
 
 class MessageRead(ORMModel):

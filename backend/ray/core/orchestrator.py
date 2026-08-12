@@ -11,6 +11,7 @@ each live elsewhere; when this file starts containing logic, that logic is in th
 wrong place.
 """
 
+import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -23,13 +24,18 @@ from ray.agents.executive import ExecutiveAgent
 from ray.config import Settings, get_settings
 from ray.core.contracts import RayRequest, TraceEvent, TraceStage
 from ray.core.events import DoneEvent, ErrorEvent, StreamEvent, TokenEvent, TraceStreamEvent
+from ray.db.session import get_sessionmaker
 from ray.domain.enums import MessageRole
 from ray.llm.base import LLMError
 from ray.llm.registry import Degradation, ProviderRegistry, get_registry
-from ray.memory.retrieval import NullRetriever, Retriever
+from ray.memory.extraction import MemoryExtractor
+from ray.memory.retrieval import Retriever, get_retriever
+from ray.memory.writer import MemoryWriter
 from ray.services import activity_service, conversation_service
 
 log = structlog.get_logger()
+
+_BACKGROUND: set[asyncio.Task[None]] = set()
 
 
 class Orchestrator:
@@ -38,12 +44,15 @@ class Orchestrator:
         *,
         providers: ProviderRegistry | None = None,
         retriever: Retriever | None = None,
+        writer: MemoryWriter | None = None,
         settings: Settings | None = None,
     ) -> None:
         self._settings = settings or get_settings()
         self._providers = providers or get_registry()
-        # Phase 3 swaps this for the real retriever; nothing else changes.
-        self._retriever = retriever or NullRetriever()
+        self._retriever = retriever or get_retriever(self._settings)
+        self._writer = writer or MemoryWriter(
+            MemoryExtractor(self._providers), settings=self._settings
+        )
 
     async def run(
         self, session: AsyncSession, request: RayRequest, user_name: str
@@ -76,9 +85,17 @@ class Orchestrator:
         history = history[:-1]
 
         memories = await self._retriever.retrieve(
-            request.user_id, request.message, project_id=request.project_id
+            session, request.user_id, request.message, project_id=request.project_id
         )
-        yield record("memory", count=len(memories))
+        # Usage counters were bumped by retrieval; commit them with the user's turn
+        # rather than leaving them to ride along with the assistant message.
+        await session.commit()
+        yield record(
+            "memory",
+            count=len(memories),
+            top_score=round(max((m.score for m in memories), default=0.0), 3),
+            categories=sorted({m.category for m in memories}),
+        )
 
         # Phase 4 replaces this constant with a routing call (ADR-0005).
         degradations: list[Degradation] = []
@@ -144,6 +161,12 @@ class Orchestrator:
         await self._finish_activity(
             session, request, conversation.id, agent.name, started, success=True
         )
+        self._learn(
+            request,
+            user_message=request.message,
+            assistant_message=content,
+            source_message_id=message.id,
+        )
 
         yield DoneEvent(
             conversation_id=conversation.id,
@@ -152,6 +175,39 @@ class Orchestrator:
             speech_text=speech_text,
             duration_ms=duration_ms,
         )
+
+    def _learn(
+        self,
+        request: RayRequest,
+        *,
+        user_message: str,
+        assistant_message: str,
+        source_message_id: uuid.UUID,
+    ) -> None:
+        """Learn from the exchange in the background (ADR-0013).
+
+        A task with its own session, not a step in the stream: extraction is a model
+        call, and the user is not waiting for it. The reference is held because
+        asyncio only weakly references running tasks, and a garbage-collected task
+        stops mid-flight.
+        """
+        if not self._settings.memory_enabled or not assistant_message.strip():
+            return
+
+        async def learn() -> None:
+            async with get_sessionmaker()() as learn_session:
+                await self._writer.write_exchange(
+                    learn_session,
+                    request.user_id,
+                    user_message=user_message,
+                    assistant_message=assistant_message,
+                    source_message_id=source_message_id,
+                    project_id=request.project_id,
+                )
+
+        task = asyncio.create_task(learn())
+        _BACKGROUND.add(task)
+        task.add_done_callback(_BACKGROUND.discard)
 
     async def _finish_activity(
         self,

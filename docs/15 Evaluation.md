@@ -30,26 +30,37 @@ set is the regression suite for behaviour.
 
 ```
 backend/tests/eval/
-├── cases/                 # YAML case definitions
-├── fixtures/              # seeded memories, projects, tasks per scenario
-├── judge.py               # rubric-based LLM judge
-└── runner.py              # executes cases, prints a scorecard
+├── cases.py               # case definitions as data (memory set shipped in Phase 3)
+├── test_memory_eval.py    # runs the memory cases through the real pipeline
+├── judge.py               # rubric-based LLM judge (Phase 4)
+└── fixtures/              # seeded projects and tasks per scenario (Phase 4)
 ```
 
-A case looks like:
+Cases are **data, not test functions**, so the set can be re-run after a weight change
+and compared, and so a case reads as a behavioural claim:
 
-```yaml
-id: memory-recalls-active-project
-fixture: starfall_sprint
-conversation: new
-input: "What should I implement next?"
-expect:
-  agent: coding
-  memories_include: [project.starfall_sprint.status]
-  tools_not_called: [calendar.create_event]
-  answer_must_mention: ["mouse aiming"]
-  answer_must_not_mention: ["as an AI language model"]
+```python
+MemoryCase(
+    id="memory-recalls-active-project",
+    seed=(STARFALL, PIZZA, CALCULUS),
+    query="What am I working on?",
+    expect_keys=("project.starfall",),
+    reject_keys=("user.pizza",),
+)
 ```
+
+Each case seeds memories, runs one request through the **orchestrator** — not the
+retriever directly — and asserts on which memories reached the model's prompt. A
+regression anywhere between the request and the prompt (scoring, filtering, budgeting,
+or the agent failing to include memories at all) fails the set. The model is scripted, so
+the result is deterministic.
+
+Run it with `uv run pytest tests/eval`.
+
+Cases run under the hashing embedding backend (ADR-0016), which matches on shared
+vocabulary rather than meaning. Cases must therefore be phrased in overlapping words, and
+cases that genuinely test *semantic* recall — "university plans" retrieving "applying to
+Waterloo" — have to be run with `RAY_EMBEDDING_BACKEND=sentence-transformers`.
 
 ---
 
@@ -69,15 +80,26 @@ Does the Executive Agent pick the right specialist?
 Assertion: exact agent set. Over-delegation is a failure, not a nicety — it costs latency
 and tokens.
 
-## 2. Memory (Phase 3)
+## 2. Memory (Phase 3) — implemented
+
+Retrieval cases live in `tests/eval/cases.py` and run through the pipeline:
 
 * In a **new** conversation, "What am I working on?" recalls the active project.
-* "What should I implement next?" retrieves project status without being told the name.
+* "What should I implement next in my game?" retrieves the project without it being named.
 * A deleted memory is **not** retrieved on the next request.
 * A disabled category is **not** retrieved.
+* An unrelated memory is **not** retrieved (the min-score floor).
+* Where two memories match equally, the more important one ranks first.
+* Where two memories match equally, the more recent one ranks first.
+
+Write-path cases are deterministic enough to live with the unit suite
+(`tests/test_memory_write.py`), since they assert on rows rather than on ranking:
+
 * Stating the same fact twice does **not** create a second memory (dedupe).
 * Stating an updated fact supersedes rather than duplicates the old one.
-* A one-off question ("what's 12 × 7?") creates **no** memory.
+* A weak candidate ("asked about the weather once") is discarded before storage.
+* A disabled category is not written to at all.
+* "Ray, remember that…" is stored verbatim, bypassing extraction and the importance floor.
 
 ## 3. Tool use and approval (Phase 4–5)
 

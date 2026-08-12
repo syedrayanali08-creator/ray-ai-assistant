@@ -17,6 +17,12 @@ TEST_TOKEN = "test-token"
 # Configure before the settings cache is populated by anything else.
 os.environ.setdefault("RAY_API_TOKEN", TEST_TOKEN)
 os.environ.setdefault("RAY_DATABASE_URL", "postgresql+asyncpg://ray:ray@localhost:5433/ray_test")
+# Hashed embeddings: deterministic, no torch, no download. The suite tests the
+# retrieval *policy*, which must not depend on a 90 MB model (ADR-0016).
+os.environ.setdefault("RAY_EMBEDDING_BACKEND", "hashing")
+# Extraction is exercised with scripted providers in the tests that care; leaving it
+# on globally would fire a background model call from every chat test.
+os.environ.setdefault("RAY_MEMORY_EXTRACTION_ENABLED", "false")
 
 
 @pytest.fixture(scope="session", autouse=True)

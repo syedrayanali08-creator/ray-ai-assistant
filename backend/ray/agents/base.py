@@ -15,7 +15,7 @@ from pathlib import Path
 from ray.agents.registry import AgentSpec
 from ray.domain.enums import Modality
 from ray.llm.base import LLMMessage
-from ray.memory.retrieval import RetrievedMemory
+from ray.memory.types import RetrievedMemory
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
