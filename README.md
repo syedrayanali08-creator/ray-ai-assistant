@@ -66,7 +66,7 @@ CI:
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, Alembic | Best AI ecosystem; async suits streaming and tool calls ([ADR-0012](docs/adr/0012-backend-stack.md)) |
 | Database | PostgreSQL 16 + pgvector | One store for relational data *and* semantic memory ([ADR-0002](docs/adr/0002-postgres-pgvector.md)) |
 | LLM | Provider abstraction: Gemini (default), Groq, Ollama | Never locked to one provider; degrades instead of breaking ([ADR-0001](docs/adr/0001-llm-provider-abstraction.md)) |
-| Embeddings | Local `sentence-transformers` (`all-MiniLM-L6-v2`) | Free, fast, and the memory corpus never leaves the machine ([ADR-0003](docs/adr/0003-local-embeddings.md)) |
+| Embeddings | Local `sentence-transformers` (`all-MiniLM-L6-v2`), with a dependency-free hashing backend | Free, fast, and the memory corpus never leaves the machine ([ADR-0003](docs/adr/0003-local-embeddings.md), [ADR-0016](docs/adr/0016-embedding-backend-fallback.md)) |
 | Frontend | Next.js 15, React 19, TypeScript, Tailwind v4, shadcn/ui | Bespoke HUD without fighting a theme ([ADR-0011](docs/adr/0011-frontend-stack.md)) |
 | Streaming | Server-Sent Events | One-directional flow; plain HTTP, reuses existing auth ([ADR-0007](docs/adr/0007-sse-streaming.md)) |
 | Voice | openWakeWord, faster-whisper, Piper — all local | Voice-first from Phase 1, free, private ([ADR-0009](docs/adr/0009-voice-first-architecture.md)) |
@@ -140,6 +140,22 @@ answered, which provider was used, how many memories were retrieved, and whether
 fallback kicked in. Every line is recorded by the code that ran the step, so it cannot
 be a story the model told.
 
+### What Ray remembers
+
+Ray learns from a conversation *after* it answers, so remembering never costs latency,
+and it stores a fact only if it is durable and would change a future answer. Saying
+**"Ray, remember that…"** stores something verbatim, no judgement applied.
+
+Everything Ray knows is at **`/memory`** (the HUD's Memory panel links to it): search it
+by keyword or semantically with the retrieval scores shown, edit or delete any row, see
+where each memory came from and how often it has been used, and switch whole categories
+off. Disabling a category stops both retrieval and future writes without deleting
+anything; deleting takes effect on Ray's very next answer.
+
+Embeddings run locally. Install the model backend with `uv sync --group embeddings`
+(~2 GB of torch); without it Ray falls back to a dependency-free hashing embedder that
+matches on shared words rather than meaning ([ADR-0016](docs/adr/0016-embedding-backend-fallback.md)).
+
 Streaming can also be watched from the terminal:
 
 ```bash
@@ -153,6 +169,9 @@ curl -N -H "Authorization: Bearer $RAY_API_TOKEN" -H 'Content-Type: application/
 # Backend: lint, types, architecture boundaries, tests
 cd backend
 uv run ruff check . && uv run mypy ray scripts && uv run lint-imports && uv run pytest
+
+# Behavioural evaluation: does memory actually change Ray's answers? (docs/15)
+uv run pytest tests/eval
 
 # Frontend: regenerate the API types after changing a response shape
 cd frontend && pnpm generate:api && pnpm lint && pnpm typecheck && pnpm test

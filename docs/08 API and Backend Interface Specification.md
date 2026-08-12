@@ -252,30 +252,47 @@ Purpose:
 
 Manage Ray's memory system.
 
-Endpoints:
+Endpoints (as implemented in Phase 3):
 
 ```
-GET /memory
-
-POST /memory
-
-PUT /memory/{id}
-
-DELETE /memory/{id}
-
-POST /memory/search
+GET    /memory                 list; ?category=, ?q= (substring), ?limit=
+GET    /memory/search          semantic search; ?q= (required), ?limit=, ?project_id=
+GET    /memory/stats           counts per category, superseded, unembedded, disabled
+GET    /memory/review          low-value, never-used memories flagged for the user
+POST   /memory                 write a memory directly
+PATCH  /memory/{id}            edit content, category, importance, or provenance note
+PUT    /memory/categories      set which categories are disabled
+DELETE /memory/{id}            hard delete
 ```
-
-Example:
 
 Create memory:
 
 ```json
 {
   "category": "project",
-  "content": "User is building Ray"
+  "content": "User is building Ray",
+  "importance": 4
 }
 ```
+
+Two searches exist deliberately. `GET /memory?q=` matches substrings, for a user
+hunting a memory they remember writing. `GET /memory/search` runs the same hybrid
+ranking retrieval uses and returns the numbers behind it:
+
+```json
+[
+  {
+    "memory": { "id": "…", "category": "project", "content": "…", "why": "…" },
+    "similarity": 0.71,
+    "score": 0.63
+  }
+]
+```
+
+`PATCH` re-embeds when `content` changes, so search follows the edit rather than
+matching the text the user just corrected. `PUT /memory/categories` disables a
+category for **both** retrieval and future writes; the rows stay and remain editable.
+`DELETE` is a hard delete and takes effect on the next request.
 
 ---
 

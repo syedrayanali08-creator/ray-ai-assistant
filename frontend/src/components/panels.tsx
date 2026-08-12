@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { Agent, CalendarEvent, Memory, Project, Task } from "@/lib/api";
 
 import { Count, EmptyState, Panel } from "@/components/panel";
@@ -116,7 +118,17 @@ export function ProjectPanel({ projects }: { projects: Project[] }) {
 
 export function MemoryPanel({ memories }: { memories: Memory[] }) {
   return (
-    <Panel title="Memory" badge={<Count value={memories.length} />}>
+    <Panel
+      title="Memory"
+      badge={
+        <span className="flex items-center gap-2">
+          <Count value={memories.length} />
+          <Link href="/memory" className="text-[10px] uppercase tracking-widest text-hud-muted hover:text-hud-accent">
+            Manage
+          </Link>
+        </span>
+      }
+    >
       {memories.length === 0 ? (
         <EmptyState>Ray has not learned anything yet.</EmptyState>
       ) : (

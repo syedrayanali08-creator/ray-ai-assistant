@@ -20,7 +20,7 @@ Status is one of `Accepted`, `Superseded by ADR-XXXX`, or `Proposed`.
 |---|---|---|
 | [0001](0001-llm-provider-abstraction.md) | LLM provider abstraction with Gemini as the default | Accepted (amended by 0015) |
 | [0002](0002-postgres-pgvector.md) | PostgreSQL + pgvector as the single data store | Accepted |
-| [0003](0003-local-embeddings.md) | Local sentence-transformers embeddings | Accepted |
+| [0003](0003-local-embeddings.md) | Local sentence-transformers embeddings | Accepted (extended by 0016) |
 | [0004](0004-unified-task-model.md) | One unified Task model | Accepted |
 | [0005](0005-agents-as-code.md) | Agents are code modules, not database rows | Accepted |
 | [0006](0006-single-user-auth.md) | Single local user and token auth for V1 | Accepted |
@@ -33,3 +33,4 @@ Status is one of `Accepted`, `Superseded by ADR-XXXX`, or `Proposed`.
 | [0013](0013-memory-policy.md) | Memory write, dedupe, and retrieval policy | Accepted |
 | [0014](0014-approval-gate.md) | Explicit user approval for side-effecting tool calls | Accepted |
 | [0015](0015-mock-provider-and-graceful-degradation.md) | Mock provider terminates the fallback chain; Groq deferred | Accepted |
+| [0016](0016-embedding-backend-fallback.md) | Embeddings degrade to a hashing backend instead of failing | Accepted (extends 0003) |

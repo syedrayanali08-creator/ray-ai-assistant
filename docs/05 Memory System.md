@@ -372,6 +372,14 @@ Retrieval is hybrid, not pure similarity: similarity, importance, recency, and p
 usage are combined, with a boost for memories scoped to the active project. See
 ADR-0013.
 
+**Two embedding backends exist** (ADR-0016). `sentence-transformers` is the default and
+is what Ray uses in practice; `hashing` needs no torch install and no download, is what
+CI runs, and is what a machine missing the optional install silently degrades to. The
+backends occupy *different vector spaces*: switching `RAY_EMBEDDING_BACKEND` invalidates
+existing embeddings and requires re-embedding. `GET /memory/stats` reports how many live
+memories have no vector, because an unembedded memory is still listed and editable but
+invisible to retrieval.
+
 No paid memory services are used.
 
 ---
@@ -391,15 +399,19 @@ Personal information belongs to the user.
 
 # Memory Interface
 
-Ray should eventually provide a memory dashboard.
+Shipped in Phase 3 at `/memory`, alongside the read-only Memory panel on the HUD.
 
 Features:
 
 * view memories
-* search memories
-* edit memories
-* remove memories
-* see why a memory exists
+* search memories — substring for hunting a known memory, semantic (with the retrieval
+  score shown) for understanding why Ray keeps using one
+* edit memories — editing the content re-embeds it, so search follows the correction
+* remove memories — a hard delete that takes effect on the next request
+* see why a memory exists — the extraction reason, the source (`conversation`, `user`,
+  or an integration), when it was created, and how often it has been used
+* switch a category off — stops both retrieval and future writes in that category
+  without deleting anything
 
 Example:
 

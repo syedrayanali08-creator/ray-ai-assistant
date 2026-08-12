@@ -297,14 +297,19 @@ Collision system
 
 # Memory View
 
-Users should be able to see and manage memories.
+Users should be able to see and manage memories. Shipped in Phase 3 at `/memory`,
+reachable from the HUD's Memory panel; the panel stays read-only so the HUD remains a
+glance surface rather than an editor.
 
 Features:
 
-* search memories
-* view categories
-* edit memories
+* search memories — substring by default, semantic when the query reads like a question,
+  with the retrieval score shown so a surprising result can be explained
+* view categories, with live counts, and switch any category off
+* edit memories — content, importance, and category
 * delete memories
+* see provenance on every row: why Ray believes it, where it came from, and how often it
+  has been used
 
 Example:
 
