@@ -7,7 +7,18 @@ import structlog
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ray.api.routes import agents, chat, dashboard, health, memory, projects, tasks, user
+from ray.api.routes import (
+    agents,
+    approvals,
+    chat,
+    dashboard,
+    health,
+    memory,
+    projects,
+    tasks,
+    tools,
+    user,
+)
 from ray.config import get_settings
 from ray.db.session import dispose_engine
 from ray.llm.registry import dispose_registry, get_registry
@@ -66,6 +77,8 @@ def create_app() -> FastAPI:
     app.include_router(agents.router, dependencies=protected)
     app.include_router(chat.router, dependencies=protected)
     app.include_router(memory.router, dependencies=protected)
+    app.include_router(tools.router, dependencies=protected)
+    app.include_router(approvals.router, dependencies=protected)
 
     return app
 

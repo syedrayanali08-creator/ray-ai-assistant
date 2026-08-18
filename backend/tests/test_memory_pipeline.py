@@ -81,7 +81,10 @@ async def test_a_brand_new_conversation_answers_from_memory(
     assert memory_trace.detail["categories"] == ["project"]
 
     # The memory reached the model, which is the only thing that makes it useful.
-    system_prompt = provider.calls[0].system
+    system_prompt = next(
+        (c.system for c in provider.calls if "Rayan" in (c.system or "")),
+        provider.calls[-1].system or "",
+    )
     assert "Starfall Sprint" in system_prompt
 
 
@@ -98,7 +101,11 @@ async def test_a_deleted_memory_is_gone_from_the_next_turn(
         e for e in events if isinstance(e, TraceStreamEvent) and e.stage == "memory"
     )
     assert memory_trace.detail["count"] == 0
-    assert "Starfall Sprint" not in (provider.calls[0].system or "")
+    prompt = next(
+        (c.system for c in provider.calls if "Rayan" in (c.system or "")),
+        provider.calls[-1].system or "",
+    )
+    assert "Starfall Sprint" not in prompt
 
 
 async def test_retrieval_is_off_when_memory_is_disabled(

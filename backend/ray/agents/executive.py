@@ -1,8 +1,8 @@
 """The Executive Agent.
 
-In Phase 2 it runs in single-agent mode: it answers everything itself. Phase 4 gives
-it the routing decision it is named for, at which point this class gains a
-``route()`` step and delegates — the rest of the pipeline does not change.
+In Phase 2 it answered everything directly. In Phase 4 it either answers directly,
+routes to a specialist, or composes the output of multiple specialists into one
+streaming answer (ADR-0008).
 """
 
 from collections.abc import AsyncIterator, Callable
@@ -61,15 +61,46 @@ class ExecutiveAgent(Agent):
         content = accumulator.text
         yield AgentFinished(content=content, speech_text=to_speech(content))
 
+    def compose(
+        self,
+        ctx: AgentContext,
+        outputs: list[dict[str, str]],
+    ) -> AsyncIterator[AgentEvent]:
+        """Combine several specialist answers into one coherent streaming answer."""
+        parts = "\n\n".join(f"### {out['agent']}\n{out['content']}" for out in outputs)
+        messages = [
+            *ctx.history,
+            LLMMessage(role="user", content=ctx.message),
+            LLMMessage(role="assistant", content=parts),
+            LLMMessage(
+                role="user",
+                content=(
+                    "Combine the above specialist notes into one concise answer. "
+                    "Do not mention the specialists unless their input is surprising. "
+                    "Lead with the answer."
+                ),
+            ),
+        ]
+        request = CompletionRequest(
+            messages=messages,
+            system=self.system_prompt(ctx),
+            temperature=self._temperature,
+        )
+
+        accumulator = StreamAccumulator()
+
+        async def _generator() -> AsyncIterator[AgentEvent]:
+            async for chunk in self._providers.stream(request, on_degrade=self._on_degrade):
+                accumulator.add(chunk)
+                if chunk.text:
+                    yield AgentToken(text=chunk.text)
+            yield AgentFinished(content=accumulator.text, speech_text=to_speech(accumulator.text))
+
+        return _generator()
+
 
 def to_speech(content: str) -> str:
-    """Best-effort spoken rendering of a written answer.
-
-    Voice output is a placeholder in Phase 2, so this is deliberately mechanical
-    rather than a second model call: strip the syntax that has no spoken form, and
-    stop at a sentence boundary once the answer gets long. Phase 6 replaces it with
-    a purpose-generated spoken variant.
-    """
+    """Best-effort spoken rendering of a written answer."""
     lines: list[str] = []
     in_code_block = False
     for line in content.splitlines():
@@ -81,7 +112,6 @@ def to_speech(content: str) -> str:
             continue
         if in_code_block or stripped.startswith("|"):
             continue
-        # Bullets and headings read badly aloud; keep the words, drop the markers.
         stripped = stripped.lstrip("#-*> ").replace("**", "").replace("`", "")
         if stripped:
             lines.append(stripped)
@@ -92,7 +122,6 @@ def to_speech(content: str) -> str:
         return spoken
 
     truncated = " ".join(words[:SPEECH_BUDGET_WORDS])
-    # Prefer ending on a sentence rather than mid-clause.
     last_stop = max(truncated.rfind("."), truncated.rfind("?"), truncated.rfind("!"))
     if last_stop > 0:
         truncated = truncated[: last_stop + 1]

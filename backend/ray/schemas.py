@@ -13,9 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ray.domain.enums import (
     EventSource,
+    InvocationStatus,
     MemoryCategory,
     MemorySource,
     Modality,
+    PermissionMode,
+    Proficiency,
     ProjectStatus,
     TaskPriority,
     TaskStatus,
@@ -112,6 +115,27 @@ class CalendarEventRead(ORMModel):
     location: str | None
     source: EventSource
     task_id: uuid.UUID | None
+
+
+class CalendarEventCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    start_time: datetime
+    end_time: datetime
+    description: str = ""
+    location: str | None = None
+    task_id: uuid.UUID | None = None
+
+
+class LearningRecordRead(ORMModel):
+    id: uuid.UUID
+    topic: str
+    category: str
+    proficiency: Proficiency
+    strengths: str | None
+    weaknesses: str | None
+    notes: str | None
+    last_reviewed: datetime | None
+    updated_at: datetime
 
 
 class MemoryRead(ORMModel):
@@ -223,6 +247,56 @@ class AgentRead(BaseModel):
     description: str
     enabled: bool
     tools: list[str]
+
+
+class ToolRead(BaseModel):
+    """A registered tool and the standing decision the user has made about it."""
+
+    name: str
+    description: str
+    side_effect: bool
+    # False where "always allow" is not offered at all: anything writing outside
+    # Ray's own database always asks (ADR-0014).
+    standing_allow_eligible: bool
+    mode: PermissionMode
+
+
+class ToolPermissionRead(BaseModel):
+    tool_name: str
+    mode: PermissionMode
+
+
+class ToolPermissionUpdate(BaseModel):
+    mode: PermissionMode
+
+
+class ToolInvocationRead(ORMModel):
+    """One tool call. The approval card is rendered from ``payload`` (ADR-0014), so
+    the user approves the action that will actually run."""
+
+    id: uuid.UUID
+    tool_name: str
+    payload: dict[str, object]
+    side_effect: bool
+    status: InvocationStatus
+    result: dict[str, object] | None
+    error: str | None
+    conversation_id: uuid.UUID | None
+    created_at: datetime
+    decided_at: datetime | None
+
+
+class ApprovalDecision(BaseModel):
+    """``always_allow`` records a standing decision alongside this one approval, which
+    is what keeps the gate from becoming click fatigue (ADR-0014)."""
+
+    always_allow: bool = False
+
+
+class ApprovalOutcome(BaseModel):
+    invocation: ToolInvocationRead
+    message: str
+    """What Ray says about the outcome, ready to append to the conversation."""
 
 
 HealthResponse.model_rebuild()

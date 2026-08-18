@@ -54,7 +54,7 @@ export function MessageList({
           ) : (
             <div className="max-w-[90%]">
               <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-hud-accent">
-                Ray
+                {message.agentName ?? "Ray"}
               </span>
               <div className="mt-1 text-hud-text">
                 {message.content !== "" && <Markdown content={message.content} />}

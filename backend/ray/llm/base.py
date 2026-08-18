@@ -19,6 +19,29 @@ class LLMMessage:
 
 
 @dataclass(frozen=True)
+class ToolSpec:
+    """A tool as the *model* sees it (ADR-0010).
+
+    Deliberately not the tool itself: no callable, no credentials, nothing that could
+    be invoked from here. ``parameters`` is JSON Schema, which is the one description
+    format every provider's function calling accepts.
+    """
+
+    name: str
+    description: str
+    parameters: dict[str, object]
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """A tool the model asked for. Whether it *runs* is not the model's decision
+    (ADR-0014) — that is the Tool Manager's."""
+
+    name: str
+    arguments: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class CompletionRequest:
     """A provider-neutral request.
 
@@ -30,6 +53,9 @@ class CompletionRequest:
     system: str = ""
     temperature: float = 0.7
     max_output_tokens: int | None = None
+    tools: Sequence[ToolSpec] = ()
+    """Offered, never required: a provider without function calling ignores these and
+    the caller falls back to something deterministic (ADR-0017)."""
 
 
 @dataclass(frozen=True)
@@ -45,6 +71,8 @@ class Completion:
     text: str
     provider: str
     model: str
+    # Populated only when the request offered tools and the model asked for one.
+    tool_calls: tuple[ToolCall, ...] = ()
     # None when the provider does not report usage; not every free tier does.
     input_tokens: int | None = None
     output_tokens: int | None = None

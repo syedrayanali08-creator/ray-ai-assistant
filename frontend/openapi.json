@@ -1021,6 +1021,300 @@
           }
         }
       }
+    },
+    "/tools": {
+      "get": {
+        "tags": [
+          "tools"
+        ],
+        "summary": "List Tools",
+        "description": "All registered tools, with descriptions from the code-side registry.",
+        "operationId": "list_tools_tools_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Tools Tools Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/tools/permissions": {
+      "get": {
+        "tags": [
+          "tools"
+        ],
+        "summary": "List Permissions",
+        "description": "The user's current permission mode for each tool.",
+        "operationId": "list_permissions_tools_permissions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Permissions Tools Permissions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/tools/permissions/{tool_name}": {
+      "put": {
+        "tags": [
+          "tools"
+        ],
+        "summary": "Update Permission",
+        "description": "Set a standing permission for a tool. External writes cannot be \"always allow\".",
+        "operationId": "update_permission_tools_permissions__tool_name__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tool_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tool Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolPermissionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Permission Tools Permissions  Tool Name  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/pending": {
+      "get": {
+        "tags": [
+          "tools"
+        ],
+        "summary": "List Pending",
+        "description": "Approval cards waiting for the user.",
+        "operationId": "list_pending_tools_pending_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ToolInvocationRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Pending Tools Pending Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/approvals": {
+      "get": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "List Approvals",
+        "description": "All pending approvals for the user.",
+        "operationId": "list_approvals_approvals_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ToolInvocationRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Approvals Approvals Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/approvals/{invocation_id}/approve": {
+      "post": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Approve Invocation",
+        "description": "Execute the stored payload and, if requested, remember the decision.",
+        "operationId": "approve_invocation_approvals__invocation_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invocation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invocation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/approvals/{invocation_id}/reject": {
+      "post": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Reject Invocation",
+        "description": "Reject the approval request without executing the payload.",
+        "operationId": "reject_invocation_approvals__invocation_id__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invocation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invocation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1061,6 +1355,35 @@
         ],
         "title": "AgentRead",
         "description": "An entry in the code-side agent registry, plus its runtime state."
+      },
+      "ApprovalDecision": {
+        "properties": {
+          "always_allow": {
+            "type": "boolean",
+            "title": "Always Allow",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ApprovalDecision",
+        "description": "``always_allow`` records a standing decision alongside this one approval, which\nis what keeps the gate from becoming click fatigue (ADR-0014)."
+      },
+      "ApprovalOutcome": {
+        "properties": {
+          "invocation": {
+            "$ref": "#/components/schemas/ToolInvocationRead"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "invocation",
+          "message"
+        ],
+        "title": "ApprovalOutcome"
       },
       "CalendarEventRead": {
         "properties": {
@@ -1369,6 +1692,17 @@
           "voice"
         ],
         "title": "HealthResponse"
+      },
+      "InvocationStatus": {
+        "type": "string",
+        "enum": [
+          "pending_approval",
+          "approved",
+          "rejected",
+          "executed",
+          "failed"
+        ],
+        "title": "InvocationStatus"
       },
       "MemoryCategory": {
         "type": "string",
@@ -1733,6 +2067,15 @@
           "voice"
         ],
         "title": "Modality"
+      },
+      "PermissionMode": {
+        "type": "string",
+        "enum": [
+          "ask",
+          "always_allow",
+          "never"
+        ],
+        "title": "PermissionMode"
       },
       "ProjectRead": {
         "properties": {
@@ -2109,6 +2452,110 @@
         },
         "type": "object",
         "title": "TaskUpdate"
+      },
+      "ToolInvocationRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "side_effect": {
+            "type": "boolean",
+            "title": "Side Effect"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InvocationStatus"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tool_name",
+          "payload",
+          "side_effect",
+          "status",
+          "result",
+          "error",
+          "conversation_id",
+          "created_at",
+          "decided_at"
+        ],
+        "title": "ToolInvocationRead",
+        "description": "One tool call. The approval card is rendered from ``payload`` (ADR-0014), so\nthe user approves the action that will actually run."
+      },
+      "ToolPermissionUpdate": {
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/PermissionMode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ToolPermissionUpdate"
       },
       "UserRead": {
         "properties": {

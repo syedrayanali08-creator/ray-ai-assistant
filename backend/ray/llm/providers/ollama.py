@@ -19,6 +19,7 @@ from ray.llm.base import (
     ProviderInfo,
     ProviderRequestError,
     ProviderUnavailableError,
+    ToolCall,
 )
 
 DEFAULT_MODEL = "llama3.2"
@@ -31,6 +32,48 @@ def _to_messages(request: CompletionRequest) -> list[dict[str, str]]:
         messages.append({"role": "system", "content": request.system})
     messages.extend({"role": m.role, "content": m.content} for m in request.messages)
     return messages
+
+
+def _to_tools(request: CompletionRequest) -> list[dict[str, object]]:
+    """Ollama borrows OpenAI's function-calling shape."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+            },
+        }
+        for tool in request.tools
+    ]
+
+
+def _tool_calls(message: dict[str, object]) -> tuple[ToolCall, ...]:
+    """Small models emit malformed tool calls often enough that this has to be
+    defensive: a call Ray cannot parse is a call Ray did not receive, which the
+    caller already handles by falling back."""
+    raw = message.get("tool_calls")
+    if not isinstance(raw, list):
+        return ()
+    calls: list[ToolCall] = []
+    for entry in raw:
+        function = entry.get("function") if isinstance(entry, dict) else None
+        if not isinstance(function, dict) or not isinstance(function.get("name"), str):
+            continue
+        arguments = function.get("arguments")
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                arguments = {}
+        calls.append(
+            ToolCall(
+                name=function["name"],
+                arguments=arguments if isinstance(arguments, dict) else {},
+            )
+        )
+    return tuple(calls)
 
 
 def _options(request: CompletionRequest) -> dict[str, object]:
@@ -70,12 +113,14 @@ class OllamaProvider(LLMProvider):
         self._client = client or httpx.AsyncClient(base_url=self._host, timeout=timeout_seconds)
 
     async def complete(self, request: CompletionRequest) -> Completion:
-        payload = {
+        payload: dict[str, object] = {
             "model": self._model,
             "messages": _to_messages(request),
             "stream": False,
             "options": _options(request),
         }
+        if request.tools:
+            payload["tools"] = _to_tools(request)
         try:
             response = await self._client.post("/api/chat", json=payload)
             response.raise_for_status()
@@ -85,8 +130,10 @@ class OllamaProvider(LLMProvider):
             raise ProviderUnavailableError(str(exc), provider=self.name) from exc
 
         body = response.json()
+        message = body.get("message", {})
         return Completion(
-            text=body.get("message", {}).get("content", ""),
+            text=message.get("content", ""),
+            tool_calls=_tool_calls(message),
             provider=self.name,
             model=self._model,
             input_tokens=body.get("prompt_eval_count"),
@@ -121,6 +168,11 @@ class OllamaProvider(LLMProvider):
 
     def info(self) -> ProviderInfo:
         return ProviderInfo(name=self.name, model=self._model, configured=True)
+
+    def supports_tools(self) -> bool:
+        """True of the API, not of every model behind it. A model that ignores the
+        tools simply answers in prose, and the caller falls back (ADR-0017)."""
+        return True
 
     async def aclose(self) -> None:
         await self._client.aclose()

@@ -82,7 +82,10 @@ async def test_memory_case(case: MemoryCase, session: AsyncSession, user_id: uui
         )
     ]
     trace = next(e for e in events if isinstance(e, TraceStreamEvent) and e.stage == "memory")
-    system_prompt = provider.calls[0].system or ""
+    system_prompt = next(
+        (c.system for c in provider.calls if "Rayan" in (c.system or "")),
+        provider.calls[-1].system or "",
+    )
 
     contents = {seed.key: seed.content for seed in case.seed}
     for key in case.expect_keys:
