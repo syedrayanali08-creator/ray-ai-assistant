@@ -161,6 +161,11 @@ Create specialized Ray capabilities behind one conversational surface.
 * Ray routes requests to the appropriate agent and says which one it used
 * the "Plan my week" user flow from `docs/13` works end to end
 * no side-effecting tool can run without explicit approval
+* the agent, tool, and approval test suites pass (ADR-0017)
+
+## Status
+
+Complete. The routing, specialist agents, Tool Manager, approval gate, and trace/approval UI are wired into the conversation and memory pipeline.
 
 ---
 

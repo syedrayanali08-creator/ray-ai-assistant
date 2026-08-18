@@ -14,11 +14,17 @@ from ray.llm.base import (
     LLMError,
     LLMProvider,
     ProviderInfo,
+    ToolCall,
 )
 
 
 class FakeProvider(LLMProvider):
-    """Yields scripted chunks, and optionally fails in a scripted way."""
+    """Yields scripted chunks, and optionally fails in a scripted way.
+
+    ``tool_routing`` makes a request with ``tools`` return a deterministic
+    ``ToolCall`` when the offered tools include the named one. This lets the
+    orchestrator and agent tests exercise the tool loop without a real model.
+    """
 
     def __init__(
         self,
@@ -27,19 +33,30 @@ class FakeProvider(LLMProvider):
         name: str = "fake",
         fail_with: LLMError | None = None,
         fail_after_chunks: int | None = None,
+        tool_routing: dict[str, dict[str, object]] | None = None,
     ) -> None:
         self.name = name
         self._chunks = chunks if chunks is not None else ["Hello", " there"]
         self._fail_with = fail_with
-        # None means "fail before producing anything"; an int fails mid-stream,
-        # which the registry must not retry.
         self._fail_after = fail_after_chunks
+        self._tool_routing = tool_routing or {}
         self.calls: list[CompletionRequest] = []
 
     async def complete(self, request: CompletionRequest) -> Completion:
         self.calls.append(request)
         if self._fail_with is not None:
             raise self._fail_with
+
+        if request.tools:
+            tool = next((t for t in request.tools if t.name in self._tool_routing), None)
+            if tool is not None:
+                return Completion(
+                    text="",
+                    provider=self.name,
+                    model="fake",
+                    tool_calls=(ToolCall(name=tool.name, arguments=self._tool_routing[tool.name]),),
+                )
+
         return Completion(text="".join(self._chunks), provider=self.name, model="fake")
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[Chunk]:

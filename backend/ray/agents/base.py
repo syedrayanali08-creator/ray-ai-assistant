@@ -16,6 +16,7 @@ from ray.agents.registry import AgentSpec
 from ray.domain.enums import Modality
 from ray.llm.base import LLMMessage
 from ray.memory.types import RetrievedMemory
+from ray.tools.types import NoTools, ToolInvoker
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -34,6 +35,7 @@ class AgentContext:
     message: str
     history: list[LLMMessage] = field(default_factory=list)
     memories: list[RetrievedMemory] = field(default_factory=list)
+    tools: ToolInvoker = field(default_factory=NoTools)
     output_modality: Modality = Modality.TEXT
     project_id: uuid.UUID | None = None
 

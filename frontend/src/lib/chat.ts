@@ -11,7 +11,7 @@ type Schemas = components["schemas"];
 
 export type Modality = Schemas["Modality"];
 
-/** Mirrors `ray.core.events`. All six are handled, though Phase 2 emits four. */
+/** Mirrors `ray.core.events`. All six are handled. */
 export type StreamEvent =
   | { event: "trace"; stage: TraceStage; detail: Record<string, unknown> }
   | { event: "token"; text: string }
@@ -121,12 +121,25 @@ export function describeStage(stage: TraceStage, detail: Record<string, unknown>
       const count = Number(detail.count ?? 0);
       return count === 0 ? "No memories retrieved" : `Retrieved ${count} memories`;
     }
-    case "routing":
-      return `Routed to the ${String(detail.agent)} agent`;
-    case "agent":
-      return `Asking ${String(detail.provider)}`;
-    case "tool":
-      return `Used ${String(detail.tool)}`;
+    case "routing": {
+      const agents = Array.isArray(detail.agents) ? detail.agents : [];
+      if (agents.length === 0) return "Executive answers directly";
+      return `Routed to ${agents.join(", ")}`;
+    }
+    case "agent": {
+      const agent = String(detail.agent ?? "Ray");
+      const provider = String(detail.provider ?? "model");
+      const composing = detail.composing ? " · composing" : "";
+      return `${agent} via ${provider}${composing}`;
+    }
+    case "tool": {
+      const tools = Array.isArray(detail.tools) ? detail.tools : [detail.tool ?? "tool"];
+      const statuses = Array.isArray(detail.statuses) ? detail.statuses : [];
+      if (statuses.length > 0) {
+        return `${tools.join(", ")} (${statuses.join(", ")})`;
+      }
+      return `Used ${tools.join(", ")}`;
+    }
     case "compose":
       if (detail.degraded_from) {
         return `${String(detail.degraded_from)} unavailable — used the fallback`;

@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     # sentence-transformer backend falls back to it rather than failing.
     embedding_backend: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
 
+    # Agent tool execution (ADR-0010, ADR-0014).
+    tool_timeout_seconds: float = 30.0
+
     # Memory (ADR-0013).
     memory_enabled: bool = True
     # Extraction costs one cheap model call per exchange, off the response path.

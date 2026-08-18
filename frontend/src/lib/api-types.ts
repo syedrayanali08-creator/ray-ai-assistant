@@ -339,6 +339,146 @@ export interface paths {
         patch: operations["update_memory_memory__memory_id__patch"];
         trace?: never;
     };
+    "/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tools
+         * @description All registered tools, with descriptions from the code-side registry.
+         */
+        get: operations["list_tools_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Permissions
+         * @description The user's current permission mode for each tool.
+         */
+        get: operations["list_permissions_tools_permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools/permissions/{tool_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Permission
+         * @description Set a standing permission for a tool. External writes cannot be "always allow".
+         */
+        put: operations["update_permission_tools_permissions__tool_name__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pending
+         * @description Approval cards waiting for the user.
+         */
+        get: operations["list_pending_tools_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Approvals
+         * @description All pending approvals for the user.
+         */
+        get: operations["list_approvals_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals/{invocation_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Invocation
+         * @description Execute the stored payload and, if requested, remember the decision.
+         */
+        post: operations["approve_invocation_approvals__invocation_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals/{invocation_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Invocation
+         * @description Reject the approval request without executing the payload.
+         */
+        post: operations["reject_invocation_approvals__invocation_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -358,6 +498,24 @@ export interface components {
             enabled: boolean;
             /** Tools */
             tools: string[];
+        };
+        /**
+         * ApprovalDecision
+         * @description ``always_allow`` records a standing decision alongside this one approval, which
+         *     is what keeps the gate from becoming click fatigue (ADR-0014).
+         */
+        ApprovalDecision: {
+            /**
+             * Always Allow
+             * @default false
+             */
+            always_allow: boolean;
+        };
+        /** ApprovalOutcome */
+        ApprovalOutcome: {
+            invocation: components["schemas"]["ToolInvocationRead"];
+            /** Message */
+            message: string;
         };
         /** CalendarEventRead */
         CalendarEventRead: {
@@ -477,6 +635,11 @@ export interface components {
             llm_provider: string;
             voice: components["schemas"]["VoiceCapabilities"];
         };
+        /**
+         * InvocationStatus
+         * @enum {string}
+         */
+        InvocationStatus: "pending_approval" | "approved" | "rejected" | "executed" | "failed";
         /**
          * MemoryCategory
          * @enum {string}
@@ -616,6 +779,11 @@ export interface components {
          * @enum {string}
          */
         Modality: "text" | "voice";
+        /**
+         * PermissionMode
+         * @enum {string}
+         */
+        PermissionMode: "ask" | "always_allow" | "never";
         /** ProjectRead */
         ProjectRead: {
             /**
@@ -743,6 +911,46 @@ export interface components {
             category?: string | null;
             /** Deadline */
             deadline?: string | null;
+        };
+        /**
+         * ToolInvocationRead
+         * @description One tool call. The approval card is rendered from ``payload`` (ADR-0014), so
+         *     the user approves the action that will actually run.
+         */
+        ToolInvocationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Side Effect */
+            side_effect: boolean;
+            status: components["schemas"]["InvocationStatus"];
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /** ToolPermissionUpdate */
+        ToolPermissionUpdate: {
+            mode: components["schemas"]["PermissionMode"];
         };
         /** UserRead */
         UserRead: {
@@ -1429,6 +1637,193 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemoryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tools_tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    list_permissions_tools_permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    update_permission_tools_permissions__tool_name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolPermissionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pending_tools_pending_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolInvocationRead"][];
+                };
+            };
+        };
+    };
+    list_approvals_approvals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolInvocationRead"][];
+                };
+            };
+        };
+    };
+    approve_invocation_approvals__invocation_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invocation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOutcome"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_invocation_approvals__invocation_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invocation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOutcome"];
                 };
             };
             /** @description Validation Error */

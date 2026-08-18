@@ -1,3 +1,4 @@
+import { ApprovalQueue } from "@/components/approval-queue";
 import { Conversation } from "@/components/conversation";
 import { AgentPanel, MemoryPanel, ProjectPanel, SchedulePanel, TaskPanel } from "@/components/panels";
 import { StatusBar } from "@/components/status-bar";
@@ -26,6 +27,10 @@ export default async function DashboardPage() {
   return (
     <main className="flex h-screen flex-col">
       <StatusBar health={health} user={dashboard.user} />
+
+      <div className="px-4 pt-4">
+        <ApprovalQueue />
+      </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
         <Conversation

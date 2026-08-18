@@ -14,9 +14,9 @@ from ray.main import create_app
 
 TEST_TOKEN = "test-token"
 
-# Configure before the settings cache is populated by anything else.
+# Tests must always run against a dedicated database, regardless of the local .env file.
 os.environ.setdefault("RAY_API_TOKEN", TEST_TOKEN)
-os.environ.setdefault("RAY_DATABASE_URL", "postgresql+asyncpg://ray:ray@localhost:5433/ray_test")
+os.environ["RAY_DATABASE_URL"] = "postgresql+asyncpg://ray:ray@localhost:5433/ray_test"
 # Hashed embeddings: deterministic, no torch, no download. The suite tests the
 # retrieval *policy*, which must not depend on a 90 MB model (ADR-0016).
 os.environ.setdefault("RAY_EMBEDDING_BACKEND", "hashing")
@@ -27,6 +27,7 @@ os.environ.setdefault("RAY_MEMORY_EXTRACTION_ENABLED", "false")
 
 @pytest.fixture(scope="session", autouse=True)
 def _settings() -> None:
+    # Ensure any .env value loaded during module import is discarded.
     get_settings.cache_clear()
     get_settings()
 

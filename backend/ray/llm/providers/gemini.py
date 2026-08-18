@@ -20,6 +20,7 @@ from ray.llm.base import (
     ProviderRequestError,
     ProviderUnavailableError,
     RateLimitedError,
+    ToolCall,
 )
 
 # The alias, not a pinned version: pinned free-tier models get their quota
@@ -41,12 +42,41 @@ def _to_contents(request: CompletionRequest) -> list[types.Content]:
     ]
 
 
+def _to_tools(request: CompletionRequest) -> list[types.Tool] | None:
+    if not request.tools:
+        return None
+    return [
+        types.Tool(
+            function_declarations=[
+                types.FunctionDeclaration(
+                    name=tool.name,
+                    description=tool.description,
+                    # Gemini validates the schema, so a tool with no arguments still
+                    # needs a well-formed empty object.
+                    parameters=types.Schema(**tool.parameters),
+                )
+                for tool in request.tools
+            ]
+        )
+    ]
+
+
 def _to_config(request: CompletionRequest) -> types.GenerateContentConfig:
     return types.GenerateContentConfig(
         system_instruction=request.system or None,
         temperature=request.temperature,
         max_output_tokens=request.max_output_tokens,
+        tools=_to_tools(request),
     )
+
+
+def _text_of(response: types.GenerateContentResponse) -> str:
+    """``response.text`` warns and can return None when the model answered with a
+    function call instead of prose, which is the normal case for a routing call."""
+    parts = response.candidates[0] if response.candidates else None
+    if parts is None or parts.content is None:
+        return ""
+    return "".join(part.text for part in parts.content.parts or [] if part.text)
 
 
 def _translate(exc: genai_errors.APIError) -> Exception:
@@ -81,7 +111,11 @@ class GeminiProvider(LLMProvider):
 
         usage = response.usage_metadata
         return Completion(
-            text=response.text or "",
+            text=_text_of(response),
+            tool_calls=tuple(
+                ToolCall(name=call.name or "", arguments=dict(call.args or {}))
+                for call in response.function_calls or []
+            ),
             provider=self.name,
             model=self._model,
             input_tokens=usage.prompt_token_count if usage else None,
