@@ -5,7 +5,7 @@ import type { Voice, VoiceState } from "@/hooks/use-voice";
 
 const LABEL: Record<VoiceState, string> = {
   idle: "Voice off",
-  armed: "Say \u201cRay\u201d",
+  armed: "Say \u201cRay\u201d or \u201cJarvis\u201d",
   listening: "Listening\u2026",
   thinking: "Thinking\u2026",
   speaking: "Responding\u2026",
@@ -18,6 +18,8 @@ const DOT: Record<VoiceState, string> = {
   thinking: "bg-hud-warn hud-pulse",
   speaking: "bg-hud-accent hud-pulse",
 };
+
+const WAKE_WORDS = ["ray", "jarvis"];
 
 /**
  * Voice affordances and the pipeline's real state (ADR-0009).
@@ -39,6 +41,8 @@ export function VoiceControl({
   voice: Voice;
 }) {
   const armed = voice.state !== "idle";
+  const wakeWords = capabilities?.wake_words ?? WAKE_WORDS;
+  const wakeLabel = wakeWords.length > 1 ? wakeWords.slice(0, -1).join(", ") + " or " + wakeWords[wakeWords.length - 1] : wakeWords[0] ?? "Ray";
 
   return (
     <div className="flex items-center gap-2">
@@ -56,13 +60,13 @@ export function VoiceControl({
         aria-label={armed ? "Disarm wake word listening" : "Arm wake word listening"}
         title={
           voice.supported
-            ? "Listen continuously for the wake word"
+            ? `Listen continuously for "${wakeLabel}"`
             : "This browser has no speech recognition"
         }
         className="flex items-center gap-2 rounded-full border border-hud-border px-3 py-1.5 text-xs text-hud-muted transition-colors hover:border-hud-accent/50 hover:text-hud-text disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className={`h-2 w-2 rounded-full ${DOT[voice.state]}`} />
-        {LABEL[voice.state]}
+        {armed && wakeWords.length > 1 ? `Say "${wakeLabel}"` : LABEL[voice.state]}
       </button>
 
       <button
@@ -70,7 +74,7 @@ export function VoiceControl({
         onClick={voice.pushToTalk}
         disabled={!voice.supported}
         aria-label="Push to talk"
-        title="Speak one request without the wake word"
+        title={voice.localReady ? "Push and hold to speak to Ray locally" : "Speak one request without the wake word"}
         className="rounded-full border border-hud-border px-2.5 py-1.5 text-xs text-hud-muted transition-colors hover:border-hud-accent/50 hover:text-hud-text disabled:cursor-not-allowed disabled:opacity-60"
       >
         ⏺
@@ -92,7 +96,9 @@ export function VoiceControl({
       </button>
 
       <span className="font-mono text-[10px] uppercase tracking-widest text-hud-muted">
-        {capabilities === null ? "unavailable" : `${capabilities.stt_backend} stt`}
+        {capabilities === null
+          ? "unavailable"
+          : `${capabilities.local_ready ? "local" : capabilities.stt_backend} voice`}
       </span>
     </div>
   );

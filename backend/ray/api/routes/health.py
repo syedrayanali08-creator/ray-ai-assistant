@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ray.config import Settings, get_settings
 from ray.db.session import get_session
 from ray.schemas import HealthResponse, VoiceCapabilities
+from ray.voice.manager import VoiceManager
 
 router = APIRouter(tags=["health"])
 
@@ -25,14 +26,19 @@ async def health(
     except Exception:
         database = "unavailable"
 
+    caps = VoiceManager(settings).info()
+
     return HealthResponse(
         status="ok" if database == "connected" else "degraded",
         version=VERSION,
         database=database,
         llm_provider=settings.llm_provider,
         voice=VoiceCapabilities(
-            stt_backend=settings.stt_backend,
-            tts_backend=settings.tts_backend,
-            wake_word_enabled=settings.wake_word_enabled,
+            stt_backend=caps.stt_backend,
+            tts_backend=caps.tts_backend,
+            wake_word_enabled=caps.wake_word_enabled,
+            wake_words=caps.wake_words,
+            local_ready=caps.local_ready,
+            local_detail=caps.local_detail,
         ),
     )

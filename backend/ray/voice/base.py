@@ -54,18 +54,35 @@ class SpeechRequest:
     metadata: dict[str, str] = field(default_factory=dict)
 
 
+class VoiceError(Exception):
+    """A voice operation cannot proceed."""
+
+
+class VoiceProviderInfo:
+    """Whether a local voice component is ready and, if not, why."""
+
+    def __init__(self, name: str, ready: bool, detail: str = "") -> None:
+        self.name = name
+        self.ready = ready
+        self.detail = detail
+
+
 class WakeWordDetector(ABC):
     """Detects the activation phrase.
 
-    Runs client-side so microphone audio never leaves the machine before
-    activation (docs/12).
+    The default implementation runs in the browser, but the same interface is
+    reused server-side for openWakeWord in Phase 6. Audio never leaves the
+    machine in either case (docs/12).
     """
 
     @abstractmethod
-    def listen(self) -> AsyncIterator[WakeEvent]: ...
+    async def feed(self, audio: bytes, *, sample_rate: int = 16_000) -> WakeEvent | None: ...
 
     @abstractmethod
-    async def stop(self) -> None: ...
+    async def reset(self) -> None: ...
+
+    @abstractmethod
+    def info(self) -> VoiceProviderInfo: ...
 
 
 class SpeechToText(ABC):
@@ -73,14 +90,22 @@ class SpeechToText(ABC):
     async def transcribe(self, audio: bytes, *, sample_rate: int = 16_000) -> Transcript: ...
 
     @abstractmethod
-    def transcribe_stream(self, chunks: AsyncIterator[AudioChunk]) -> AsyncIterator[Transcript]:
+    async def transcribe_stream(
+        self, chunks: AsyncIterator[AudioChunk]
+    ) -> AsyncIterator[Transcript]:
         """Yield partial transcripts so the HUD can show words as they are spoken."""
+
+    @abstractmethod
+    def info(self) -> VoiceProviderInfo: ...
 
 
 class TextToSpeech(ABC):
     @abstractmethod
-    def synthesize(self, request: SpeechRequest) -> AsyncIterator[AudioChunk]:
+    async def synthesize(self, request: SpeechRequest) -> AsyncIterator[AudioChunk]:
         """Stream audio so playback starts before the whole answer is rendered."""
 
     @abstractmethod
     async def available_voices(self) -> list[str]: ...
+
+    @abstractmethod
+    def info(self) -> VoiceProviderInfo: ...

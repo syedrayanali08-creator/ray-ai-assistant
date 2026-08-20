@@ -34,3 +34,5 @@ Status is one of `Accepted`, `Superseded by ADR-XXXX`, or `Proposed`.
 | [0014](0014-approval-gate.md) | Explicit user approval for side-effecting tool calls | Accepted |
 | [0015](0015-mock-provider-and-graceful-degradation.md) | Mock provider terminates the fallback chain; Groq deferred | Accepted |
 | [0016](0016-embedding-backend-fallback.md) | Embeddings degrade to a hashing backend instead of failing | Accepted (extends 0003) |
+| [0017](0017-tool-calling-and-provider-fallback.md) | Tool calling and provider fallback | Accepted |
+| [0018](0018-local-voice-pipeline.md) | Local voice providers behind optional model downloads | Accepted (extends 0009) |

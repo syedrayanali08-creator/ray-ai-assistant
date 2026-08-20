@@ -20,6 +20,7 @@ from ray.api.routes import (
     tasks,
     tools,
     user,
+    voice,
 )
 from ray.config import get_settings
 from ray.db.session import dispose_engine
@@ -83,6 +84,9 @@ def create_app() -> FastAPI:
     app.include_router(approvals.router, dependencies=protected)
     app.include_router(calendar.router, dependencies=protected)
     app.include_router(integrations.router, dependencies=protected)
+    # Voice has its own query-param auth because WebSocket browsers cannot set
+    # arbitrary headers. It still verifies the API token before accepting.
+    app.include_router(voice.router)
 
     return app
 

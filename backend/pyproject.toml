@@ -27,6 +27,14 @@ dependencies = [
 embeddings = [
     "sentence-transformers>=3.3.0",
 ]
+# Local voice stack (Phase 6). Kept optional because faster-whisper/Piper pull in
+# torch/onnxruntime and require downloaded model files. openWakeWord must be
+# installed manually (it is not yet published with Python 3.12 wheels).
+voice = [
+    "faster-whisper>=1.1.0",
+    "piper-tts>=1.7.0",
+    "numpy>=2.0.0",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
@@ -61,6 +69,11 @@ ignore_missing_imports = true
 # Optional install (see the `embeddings` group); absent in the default environment.
 [[tool.mypy.overrides]]
 module = ["sentence_transformers.*"]
+ignore_missing_imports = true
+
+# Optional install (see the `voice` group); absent in the default environment.
+[[tool.mypy.overrides]]
+module = ["faster_whisper.*", "piper.*", "openwakeword.*", "numpy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

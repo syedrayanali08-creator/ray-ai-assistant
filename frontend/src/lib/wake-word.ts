@@ -25,7 +25,7 @@ export interface WakeWordDetector {
   reset(): void;
 }
 
-export const DEFAULT_WAKE_WORDS = ["ray"] as const;
+export const DEFAULT_WAKE_WORDS = ["ray", "jarvis"] as const;
 
 /**
  * Matches a keyword at a word boundary, and only reports it once until reset, so

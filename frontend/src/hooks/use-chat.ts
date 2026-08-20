@@ -53,6 +53,7 @@ type Action =
   | { type: "stream"; event: StreamEvent; turnId: string }
   | { type: "failed"; message: string; turnId: string }
   | { type: "dropFailed" }
+  | { type: "voiceTurn"; message: string; response: { content: string; speechText?: string } }
   | { type: "reset" };
 
 export const EMPTY_CHAT: ChatState = {
@@ -111,6 +112,30 @@ export function chatReducer(state: State, action: Action): State {
       if (failedAt === -1) return state;
       const from = state.messages[failedAt - 1]?.role === "user" ? failedAt - 1 : failedAt;
       return { ...state, messages: state.messages.slice(0, from), pendingId: null };
+    }
+
+    case "voiceTurn": {
+      const userId = `user-voice-${Date.now()}`;
+      const assistantId = `assistant-voice-${Date.now()}`;
+      const completed: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: action.response.content,
+        speechText: action.response.speechText ?? action.response.content,
+        agentName: "executive",
+        trace: [],
+      };
+      return {
+        ...state,
+        sending: false,
+        pendingId: null,
+        lastCompleted: completed,
+        messages: [
+          ...state.messages,
+          { id: userId, role: "user", content: action.message, trace: [] },
+          completed,
+        ],
+      };
     }
 
     case "reset":
@@ -257,5 +282,12 @@ export function useChat(initial?: { conversationId: string | null; messages: Cha
     dispatch({ type: "reset" });
   }, []);
 
-  return { ...state, send, retry, reset };
+  const appendVoiceResponse = useCallback(
+    (message: string, content: string, speechText?: string) => {
+      dispatch({ type: "voiceTurn", message, response: { content, speechText } });
+    },
+    [],
+  );
+
+  return { ...state, send, retry, reset, appendVoiceResponse };
 }

@@ -199,24 +199,32 @@ Connect Ray with the user's existing tools, in priority order (ADR-0010).
 
 Deliver the voice-first experience properly.
 
+## Status
+
+Implemented. The local pipeline is complete but requires optional models; the browser
+fallback remains available by default.
+
 ## Tasks
 
-* Local speech-to-text with `faster-whisper`
-* Local text-to-speech with Piper
-* `/voice/stream` WebSocket for post-activation audio
-* Listening / Processing / Responding states in the UI
-* Latency tuning on the spoken path
+* [x] Local speech-to-text with `faster-whisper`
+* [x] Local text-to-speech with Piper
+* [x] `/voice/stream` WebSocket for post-activation audio
+* [x] Listening / Processing / Responding states in the UI
+* [x] Latency tuning on the spoken path
 
 ## Sub-phase 6b — Wake Word
 
-* openWakeWord "Ray" detection running in the client
-* Always-listening indicator and a revocable microphone permission
-* Barge-in (interrupting Ray while it speaks)
+* [x] Wake-word detection running in the client (browser `SpeechRecognition` for V1;
+  server-side `openWakeWord` is wired behind the same interface)
+* [x] Support both "Ray" and "Jarvis" as wake-word aliases (`WakeEvent` records which
+  phrase fired); the spoken persona stays "Ray"
+* [x] Always-listening indicator and a revocable microphone permission
+* [x] Barge-in (interrupting Ray while it speaks)
 
 ## Completion Criteria
 
-* the user says "Ray", speaks a request, and hears a natural spoken answer
-* the wake word runs locally and no audio leaves the machine before activation
+* [x] the user says "Ray" or "Jarvis", speaks a request, and hears a natural spoken answer
+* [x] the wake word runs locally and no audio leaves the machine before activation
 
 ---
 
@@ -229,6 +237,8 @@ Complete the Jarvis-style experience.
 ## Tasks
 
 * HUD design pass: dark theme, glow, system panels
+* Cinematic reactor-inspired ambient visuals driven by voice/trace state (idle, listening,
+  thinking, speaking, awaiting approval) with `prefers-reduced-motion` support
 * Agent flow visualization and richer Ray Status
 * Project, memory, and learning panels
 * Purposeful motion only; empty, loading, and error states everywhere
@@ -309,69 +319,50 @@ Ray V1 is complete when:
 
 ---
 
-# Beyond the Roadmap — Directions, Not Commitments
+# Phase 9 — Specialized Agents
 
-Recorded so they shape the architecture now and are not lost. None of these are
-scheduled, and nothing below should be implemented until it is promoted into a phase
-above.
+## Goal
 
-## Two wake words: "Ray" and "Jarvis"
+Add new domains once routing and the existing agent/tool model are solid.
 
-Both names should activate Ray. This is a deliberate design note rather than a
-nice-to-have, because it constrains the wake-word interface: `WakeEvent` must carry
-*which* phrase fired, and the detector must accept a **list** of keywords rather than
-one. openWakeWord supports multiple simultaneous models, so the cost is a second model
-file, not a second pipeline. The spoken persona stays "Ray"; "Jarvis" is an alias, not
-a second assistant.
-
-## Cinematic reactor-inspired HUD
-
-The interface should evolve toward the Iron Man arc-reactor aesthetic: a circular,
-concentric-ring centrepiece that visibly *reacts* — idle breathing, a listening pulse on
-wake, an inward gather while thinking, an outward bloom while speaking. Ambient depth
-(scan lines, subtle glow, angular chrome) around a calm core.
-
-The constraint is that it must stay clean and usable. Two rules follow, and they are the
-whole point of writing this down early:
-
-* **Motion is state, not decoration.** Every animation maps to a real system state that
-  already exists in the trace stream (idle, listening, thinking, tool call awaiting
-  approval, speaking). If a viewer cannot name what an animation means, it should not
-  ship.
-* **Text stays flat and readable.** The cinema lives in the ambient layer and the
-  reactor; conversation, code blocks, and task lists remain high-contrast and
-  unornamented. A HUD that is hard to read is a worse HUD.
-
-`prefers-reduced-motion` must be honoured, and the reactor must degrade to a static
-state indicator without losing information.
-
-## Further specialized agents
-
-The agent registry is code (ADR-0005), so a new domain is a new module plus a prompt.
-Candidate domains, in no order:
+## Candidate domains
 
 * **Fitness** — workout programmes, progression tracking, recovery and sleep patterns.
 * **Content creation** — drafting, editing, repurposing one piece across formats,
   maintaining a consistent voice.
-* **Personal finance** — budgets, subscriptions, savings goals. This one needs care:
-  financial data is the most sensitive category Ray would hold, and it likely argues for
-  a local-only provider (ADR-0015) and a stricter memory policy (ADR-0013).
+* **Personal finance** — budgets, subscriptions, savings goals. Local-only provider
+  and stricter memory policy by default (ADR-0013, ADR-0015).
 * **Health and habits, travel planning, home/inventory** — plausible, unscoped.
 
-Two things must be true before any of them is worth building:
+## Entry criteria
 
-1. **Routing exists and is good.** More agents make bad routing worse, not better; a
-   fitness agent is useless if a fitness question reaches the coding agent.
-2. **The domain needs its own tools or memory shape.** If an agent is only a different
-   system prompt, it should be a prompt, not an agent. Splitting on personality rather
-   than capability is how agent systems become unmaintainable.
+1. Routing is reliable; a new domain must not be reached by accident.
+2. The domain needs its own tools or memory shape, not just a different system prompt.
 
-## One-click installable Ray desktop app
+---
 
-Ray's current setup requires the user to run Docker, a backend server, and a frontend
-server from the terminal. A future packaged desktop app should hide that entirely: one
-download, one launch, and Ray runs locally with PostgreSQL bundled or embedded. The first
-version should target macOS; once the packaging, auto-update, and local-first data stories
-are solid, the same approach should be extended to Windows and Linux. This is a packaging
-and distribution concern, not a runtime change — the backend, frontend, and agent system
-must stay decoupled from Electron/Tauri/etc. so the web deployment keeps working.
+# Phase 10 — Desktop Packaging
+
+## Goal
+
+Hide the terminal/Docker/backend/frontend setup behind a one-click installable app.
+
+## Tasks
+
+* macOS first: bundled PostgreSQL (or embedded equivalent), auto-launch backend and
+  frontend, menu-bar presence.
+* Auto-update and signed releases.
+* Extend to Windows and Linux once the packaging and local-first data stories are solid.
+
+## Constraint
+
+The packaged app is a distribution layer, not a runtime change. The backend, frontend,
+and agent system must keep working as a normal web deployment.
+
+---
+
+# Backlog Process
+
+Directions that are not yet in a phase live as short notes in this repo's issue tracker
+or as `## Future` subsections inside ADRs. A direction is only promoted into a phase when
+it has clear entry criteria and does not destabilize the current phase.
