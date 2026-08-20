@@ -1,12 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ray.db.models import CalendarEvent
 from ray.domain.enums import EventSource
-from ray.schemas import CalendarEventCreate, CalendarEventRead
+from ray.schemas import CalendarEventCreate, CalendarEventRead, CalendarEventUpdate
 from ray.services.errors import InvalidEventError
 
 
@@ -30,6 +30,16 @@ async def list_events(
     return [CalendarEventRead.model_validate(e) for e in result.scalars()]
 
 
+async def get_event(
+    session: AsyncSession, user_id: uuid.UUID, event_id: uuid.UUID
+) -> CalendarEventRead | None:
+    stmt = select(CalendarEvent).where(
+        CalendarEvent.id == event_id, CalendarEvent.user_id == user_id
+    )
+    event = (await session.execute(stmt)).scalar_one_or_none()
+    return CalendarEventRead.model_validate(event) if event is not None else None
+
+
 async def create_event(
     session: AsyncSession, user_id: uuid.UUID, data: CalendarEventCreate
 ) -> CalendarEventRead:
@@ -44,3 +54,129 @@ async def create_event(
     session.add(event)
     await session.flush()
     return CalendarEventRead.model_validate(event)
+
+
+async def update_event(
+    session: AsyncSession, user_id: uuid.UUID, event_id: uuid.UUID, data: CalendarEventUpdate
+) -> CalendarEventRead | None:
+    stmt = select(CalendarEvent).where(
+        CalendarEvent.id == event_id, CalendarEvent.user_id == user_id
+    )
+    event = (await session.execute(stmt)).scalar_one_or_none()
+    if event is None:
+        return None
+
+    fields = data.model_dump(exclude_unset=True)
+    if {"start_time", "end_time"} <= set(fields.keys()):
+        if fields["end_time"] <= fields["start_time"]:
+            raise InvalidEventError("An event must end after it starts.")
+    elif "end_time" in fields and event.start_time is not None:
+        if fields["end_time"] <= event.start_time:
+            raise InvalidEventError("An event must end after it starts.")
+    elif "start_time" in fields and event.end_time is not None:
+        if event.end_time <= fields["start_time"]:
+            raise InvalidEventError("An event must end after it starts.")
+
+    for field, value in fields.items():
+        setattr(event, field, value)
+
+    await session.flush()
+    await session.refresh(event)
+    return CalendarEventRead.model_validate(event)
+
+
+async def delete_event(session: AsyncSession, user_id: uuid.UUID, event_id: uuid.UUID) -> bool:
+    stmt = select(CalendarEvent).where(
+        CalendarEvent.id == event_id, CalendarEvent.user_id == user_id
+    )
+    event = (await session.execute(stmt)).scalar_one_or_none()
+    if event is None:
+        return False
+    await session.delete(event)
+    return True
+
+
+def _ics_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace(",", "\\,").replace(";", "\\;").replace("\n", "\\n")
+
+
+def _ics_dt(dt: datetime) -> str:
+    """Format a datetime as UTC ICS timestamp."""
+    dt = dt.astimezone(UTC)
+    return dt.strftime("%Y%m%dT%H%M%SZ")
+
+
+def export_ics(events: list[CalendarEventRead]) -> str:
+    """Build a minimal VCALENDAR from local events."""
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Ray//EN"]
+    for event in events:
+        lines.extend(
+            [
+                "BEGIN:VEVENT",
+                f"UID:{event.id}@ray.local",
+                f"DTSTAMP:{_ics_dt(datetime.now(UTC))}",
+                f"DTSTART:{_ics_dt(event.start_time)}",
+                f"DTEND:{_ics_dt(event.end_time)}",
+                f"SUMMARY:{_ics_escape(event.title)}",
+            ]
+        )
+        if event.description:
+            lines.append(f"DESCRIPTION:{_ics_escape(event.description)}")
+        if event.location:
+            lines.append(f"LOCATION:{_ics_escape(event.location)}")
+        lines.append("END:VEVENT")
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines)
+
+
+def import_ics(ics_data: str) -> list[CalendarEventCreate]:
+    """Parse a minimal ICS feed into create requests.
+
+    This is intentionally simple: it reads BEGIN:VEVENT blocks and extracts the
+    fields Ray cares about. Complex recurrence rules are ignored; an external
+    calendar is a mirror, not a master.
+    """
+    events: list[CalendarEventCreate] = []
+    current: dict[str, str] = {}
+    in_event = False
+
+    for raw in ics_data.splitlines():
+        line = raw.strip()
+        if line == "BEGIN:VEVENT":
+            in_event = True
+            current = {}
+        elif line == "END:VEVENT":
+            in_event = False
+            title = current.get("SUMMARY", "Imported event")
+            description = current.get("DESCRIPTION", "")
+            location = current.get("LOCATION")
+            try:
+                start = _parse_ics_dt(current["DTSTART"])
+                end = _parse_ics_dt(current["DTEND"])
+            except KeyError:
+                continue
+            events.append(
+                CalendarEventCreate(
+                    title=title,
+                    description=description,
+                    start_time=start,
+                    end_time=end,
+                    location=location,
+                )
+            )
+        elif in_event and ":" in line:
+            key, value = line.split(":", 1)
+            if key.startswith("DTSTART") or key.startswith("DTEND"):
+                key = key.split(";")[0]
+            current[key] = value
+
+    return events
+
+
+def _parse_ics_dt(value: str) -> datetime:
+    value = value.strip()
+    if value.endswith("Z"):
+        return datetime.strptime(value, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+    if "T" in value:
+        return datetime.strptime(value, "%Y%m%dT%H%M%S").replace(tzinfo=UTC)
+    return datetime.strptime(value, "%Y%m%d").replace(tzinfo=UTC)

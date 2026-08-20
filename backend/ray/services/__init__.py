@@ -3,6 +3,7 @@
 from ray.services import (
     agent_service,
     calendar_service,
+    integration_service,
     learning_service,
     memory_service,
     project_service,
@@ -14,6 +15,7 @@ from ray.services import (
 __all__ = [
     "agent_service",
     "calendar_service",
+    "integration_service",
     "learning_service",
     "memory_service",
     "project_service",

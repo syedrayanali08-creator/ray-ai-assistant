@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+
 import type { Health, User } from "@/lib/api";
 
 /**
@@ -12,11 +15,21 @@ export function StatusBar({ health, user }: { health: Health | null; user: User 
   return (
     <header className="flex items-center justify-between border-b border-hud-border bg-hud-panel/50 px-6 py-3">
       <div className="flex items-baseline gap-3">
-        <span className="font-mono text-lg tracking-[0.3em] text-hud-accent">RAY</span>
+        <Link href="/" className="font-mono text-lg tracking-[0.3em] text-hud-accent">
+          RAY
+        </Link>
         <span className="text-sm text-hud-muted">
           {user ? `${user.name}'s assistant` : "No user seeded"}
         </span>
       </div>
+
+      <nav className="hidden items-center gap-4 text-xs text-hud-muted sm:flex">
+        <NavLink href="/projects">Projects</NavLink>
+        <NavLink href="/tasks">Tasks</NavLink>
+        <NavLink href="/calendar">Calendar</NavLink>
+        <NavLink href="/memory">Memory</NavLink>
+        <NavLink href="/settings">Settings</NavLink>
+      </nav>
 
       <div className="flex items-center gap-5 font-mono text-[11px] uppercase tracking-widest">
         <Indicator label={health?.llm_provider ?? "no provider"} state={online ? "ok" : "off"} />
@@ -28,6 +41,14 @@ export function StatusBar({ health, user }: { health: Health | null; user: User 
         />
       </div>
     </header>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="uppercase tracking-widest hover:text-hud-accent">
+      {children}
+    </Link>
   );
 }
 

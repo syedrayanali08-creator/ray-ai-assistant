@@ -65,7 +65,8 @@ export interface paths {
         /** List Projects */
         get: operations["list_projects_projects_get"];
         put?: never;
-        post?: never;
+        /** Create Project */
+        post: operations["create_project_projects_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -83,10 +84,12 @@ export interface paths {
         get: operations["get_project_projects__project_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Project */
+        delete: operations["delete_project_projects__project_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Project */
+        patch: operations["update_project_projects__project_id__patch"];
         trace?: never;
     };
     "/tasks": {
@@ -479,6 +482,180 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Events */
+        get: operations["list_events_calendar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today Events */
+        get: operations["today_events_calendar_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/export.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Ics */
+        get: operations["export_ics_calendar_export_ics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/import.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Ics */
+        post: operations["import_ics_calendar_import_ics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event */
+        get: operations["get_event_calendar__event_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/event": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Event */
+        post: operations["create_event_calendar_event_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/event/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Event */
+        delete: operations["delete_event_calendar_event__event_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Event */
+        patch: operations["update_event_calendar_event__event_id__patch"];
+        trace?: never;
+    };
+    "/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Integrations */
+        get: operations["list_integrations_integrations_get"];
+        put?: never;
+        /** Create Integration */
+        post: operations["create_integration_integrations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/{integration_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Integration */
+        get: operations["get_integration_integrations__integration_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Integration */
+        delete: operations["delete_integration_integrations__integration_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Integration */
+        patch: operations["update_integration_integrations__integration_id__patch"];
+        trace?: never;
+    };
+    "/integrations/{integration_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Integration */
+        post: operations["check_integration_integrations__integration_id__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -517,6 +694,30 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** CalendarEventCreate */
+        CalendarEventCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Location */
+            location?: string | null;
+            /** Task Id */
+            task_id?: string | null;
+        };
         /** CalendarEventRead */
         CalendarEventRead: {
             /**
@@ -541,8 +742,25 @@ export interface components {
             /** Location */
             location: string | null;
             source: components["schemas"]["EventSource"];
+            /** External Id */
+            external_id: string | null;
             /** Task Id */
             task_id: string | null;
+        };
+        /** CalendarEventUpdate */
+        CalendarEventUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Task Id */
+            task_id?: string | null;
         };
         /**
          * ChatRequest
@@ -634,6 +852,83 @@ export interface components {
             /** Llm Provider */
             llm_provider: string;
             voice: components["schemas"]["VoiceCapabilities"];
+        };
+        /** IntegrationCheck */
+        IntegrationCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+        };
+        /** IntegrationCreate */
+        IntegrationCreate: {
+            type: components["schemas"]["IntegrationType"];
+            /** Provider */
+            provider: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Credentials Reference */
+            credentials_reference?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+        };
+        /** IntegrationRead */
+        IntegrationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            type: components["schemas"]["IntegrationType"];
+            /** Provider */
+            provider: string;
+            /** Enabled */
+            enabled: boolean;
+            status: components["schemas"]["IntegrationStatus"];
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Last Sync */
+            last_sync: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * IntegrationStatus
+         * @enum {string}
+         */
+        IntegrationStatus: "connected" | "disconnected" | "error";
+        /**
+         * IntegrationType
+         * @enum {string}
+         */
+        IntegrationType: "github" | "calendar" | "knowledge" | "files";
+        /** IntegrationUpdate */
+        IntegrationUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Credentials Reference */
+            credentials_reference?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * InvocationStatus
@@ -784,6 +1079,22 @@ export interface components {
          * @enum {string}
          */
         PermissionMode: "ask" | "always_allow" | "never";
+        /** ProjectCreate */
+        ProjectCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** @default active */
+            status: components["schemas"]["ProjectStatus"];
+            /** Technology Stack */
+            technology_stack?: string[];
+            /** Repo Url */
+            repo_url?: string | null;
+        };
         /** ProjectRead */
         ProjectRead: {
             /**
@@ -818,6 +1129,20 @@ export interface components {
          * @enum {string}
          */
         ProjectStatus: "planning" | "active" | "paused" | "complete" | "archived";
+        /** ProjectUpdate */
+        ProjectUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            status?: components["schemas"]["ProjectStatus"] | null;
+            /** Technology Stack */
+            technology_stack?: string[] | null;
+            /** Progress */
+            progress?: number | null;
+            /** Repo Url */
+            repo_url?: string | null;
+        };
         /**
          * ProviderStatus
          * @description One link in the provider chain, and why it is or is not usable.
@@ -1100,6 +1425,39 @@ export interface operations {
             };
         };
     };
+    create_project_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_project_projects__project_id__get: {
         parameters: {
             query?: never;
@@ -1110,6 +1468,70 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project_projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -1824,6 +2246,430 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalOutcome"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_calendar_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    today_events_calendar_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"][];
+                };
+            };
+        };
+    };
+    export_ics_calendar_export_ics_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_ics_calendar_import_ics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/calendar": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_calendar__event_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_calendar_event_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_calendar_event__event_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_event_calendar_event__event_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_integrations_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationRead"][];
+                };
+            };
+        };
+    };
+    create_integration_integrations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_integration_integrations__integration_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_integration_integrations__integration_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_integration_integrations__integration_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_integration_integrations__integration_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationCheck"];
                 };
             };
             /** @description Validation Error */
