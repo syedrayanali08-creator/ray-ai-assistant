@@ -10,9 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from ray.api.routes import (
     agents,
     approvals,
+    calendar,
     chat,
     dashboard,
     health,
+    integrations,
     memory,
     projects,
     tasks,
@@ -79,6 +81,8 @@ def create_app() -> FastAPI:
     app.include_router(memory.router, dependencies=protected)
     app.include_router(tools.router, dependencies=protected)
     app.include_router(approvals.router, dependencies=protected)
+    app.include_router(calendar.router, dependencies=protected)
+    app.include_router(integrations.router, dependencies=protected)
 
     return app
 

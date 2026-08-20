@@ -13,6 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ray.domain.enums import (
     EventSource,
+    IntegrationStatus,
+    IntegrationType,
     InvocationStatus,
     MemoryCategory,
     MemorySource,
@@ -72,6 +74,23 @@ class ProjectRead(ORMModel):
     updated_at: datetime
 
 
+class ProjectCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    status: ProjectStatus = ProjectStatus.ACTIVE
+    technology_stack: list[str] = Field(default_factory=list)
+    repo_url: str | None = None
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    status: ProjectStatus | None = None
+    technology_stack: list[str] | None = None
+    progress: int | None = Field(default=None, ge=0, le=100)
+    repo_url: str | None = None
+
+
 class TaskRead(ORMModel):
     id: uuid.UUID
     project_id: uuid.UUID | None
@@ -114,6 +133,7 @@ class CalendarEventRead(ORMModel):
     end_time: datetime
     location: str | None
     source: EventSource
+    external_id: str | None
     task_id: uuid.UUID | None
 
 
@@ -122,6 +142,15 @@ class CalendarEventCreate(BaseModel):
     start_time: datetime
     end_time: datetime
     description: str = ""
+    location: str | None = None
+    task_id: uuid.UUID | None = None
+
+
+class CalendarEventUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    description: str | None = None
     location: str | None = None
     task_id: uuid.UUID | None = None
 
@@ -297,6 +326,39 @@ class ApprovalOutcome(BaseModel):
     invocation: ToolInvocationRead
     message: str
     """What Ray says about the outcome, ready to append to the conversation."""
+
+
+class IntegrationRead(ORMModel):
+    id: uuid.UUID
+    type: IntegrationType
+    provider: str
+    enabled: bool
+    status: IntegrationStatus
+    config: dict[str, object]
+    last_sync: datetime | None
+    last_error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class IntegrationCreate(BaseModel):
+    type: IntegrationType
+    provider: str = Field(min_length=1, max_length=50)
+    enabled: bool = True
+    # Name of an environment variable or keyring key that holds the secret.
+    credentials_reference: str | None = Field(default=None, max_length=200)
+    config: dict[str, object] = Field(default_factory=dict)
+
+
+class IntegrationUpdate(BaseModel):
+    enabled: bool | None = None
+    credentials_reference: str | None = Field(default=None, max_length=200)
+    config: dict[str, object] | None = None
+
+
+class IntegrationCheck(BaseModel):
+    ok: bool
+    message: str
 
 
 HealthResponse.model_rebuild()

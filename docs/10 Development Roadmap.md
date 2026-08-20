@@ -365,3 +365,13 @@ Two things must be true before any of them is worth building:
 2. **The domain needs its own tools or memory shape.** If an agent is only a different
    system prompt, it should be a prompt, not an agent. Splitting on personality rather
    than capability is how agent systems become unmaintainable.
+
+## One-click installable Ray desktop app
+
+Ray's current setup requires the user to run Docker, a backend server, and a frontend
+server from the terminal. A future packaged desktop app should hide that entirely: one
+download, one launch, and Ray runs locally with PostgreSQL bundled or embedded. The first
+version should target macOS; once the packaging, auto-update, and local-first data stories
+are solid, the same approach should be extended to Windows and Linux. This is a packaging
+and distribution concern, not a runtime change — the backend, frontend, and agent system
+must stay decoupled from Electron/Tauri/etc. so the web deployment keeps working.

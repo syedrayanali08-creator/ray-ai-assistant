@@ -43,7 +43,15 @@ AGENTS: dict[str, AgentSpec] = {
         description=(
             "Project-aware programming help that teaches rather than replacing the user's work."
         ),
-        tools=("projects.get", "github.read_repo", "github.read_file", "files.read"),
+        tools=(
+            "projects.get",
+            "github.read_repo",
+            "github.read_tree",
+            "github.read_file",
+            "github.read_issues",
+            "github.read_commits",
+            "files.read",
+        ),
     ),
     "learning": AgentSpec(
         name="learning",
@@ -54,8 +62,8 @@ AGENTS: dict[str, AgentSpec] = {
     "research": AgentSpec(
         name="research",
         display_name="Research Agent",
-        description="Structured investigation that ends in an actionable plan.",
-        tools=("web.search", "knowledge.search", "files.read"),
+        description="Structured investigation using memory, files, and knowledge sources.",
+        tools=("memory.search", "knowledge.search", "files.read", "projects.list"),
     ),
 }
 
