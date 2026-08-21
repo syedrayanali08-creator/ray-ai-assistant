@@ -33,6 +33,7 @@ from ray.voice.base import (
 np: Any = None
 try:
     import numpy as _np
+
     np = _np
 except Exception:  # pragma: no cover - CI without the voice group
     pass
@@ -40,6 +41,7 @@ except Exception:  # pragma: no cover - CI without the voice group
 WhisperModel: Any = None
 try:
     from faster_whisper import WhisperModel as _WhisperModel
+
     WhisperModel = _WhisperModel
 except Exception:  # pragma: no cover
     pass
@@ -49,6 +51,7 @@ SynthesisConfig: Any = None
 try:
     from piper import PiperVoice as _PiperVoice
     from piper.config import SynthesisConfig as _SynthesisConfig
+
     PiperVoice = _PiperVoice
     SynthesisConfig = _SynthesisConfig
 except Exception:  # pragma: no cover
@@ -57,6 +60,7 @@ except Exception:  # pragma: no cover
 OpenWakeWordModel: Any = None
 try:
     from openwakeword.model import Model as _OpenWakeWordModel
+
     OpenWakeWordModel = _OpenWakeWordModel
 except Exception:  # pragma: no cover
     pass
