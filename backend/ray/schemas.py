@@ -51,6 +51,9 @@ class VoiceCapabilities(BaseModel):
     tts_backend: str
     wake_word_enabled: bool
     wake_word_phrase: str = "Ray"
+    wake_words: list[str] = ["ray", "jarvis"]
+    local_ready: bool = False
+    local_detail: str = ""
 
 
 class UserRead(ORMModel):

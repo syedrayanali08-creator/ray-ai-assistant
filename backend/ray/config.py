@@ -78,6 +78,15 @@ class Settings(BaseSettings):
     stt_backend: Literal["browser", "local"] = "browser"
     tts_backend: Literal["browser", "local"] = "browser"
     wake_word_enabled: bool = False
+    # faster-whisper model size ("tiny", "base", "small" ...) or path to a converted model.
+    stt_model: str = "tiny"
+    stt_language: str | None = None
+    # Path to a Piper .onnx voice model. Empty means TTS is unavailable.
+    tts_voice: str = ""
+    tts_length_scale: float = 1.0
+    # Path to an openWakeWord .tflite model. Empty disables server-side wake word.
+    wake_word_model: str = ""
+    wake_words: list[str] = Field(default_factory=lambda: ["ray", "jarvis"])
 
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 

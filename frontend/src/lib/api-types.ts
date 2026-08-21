@@ -1335,6 +1335,24 @@ export interface components {
              * @default Ray
              */
             wake_word_phrase: string;
+            /**
+             * Wake Words
+             * @default [
+             *       "ray",
+             *       "jarvis"
+             *     ]
+             */
+            wake_words: string[];
+            /**
+             * Local Ready
+             * @default false
+             */
+            local_ready: boolean;
+            /**
+             * Local Detail
+             * @default
+             */
+            local_detail: string;
         };
     };
     responses: never;

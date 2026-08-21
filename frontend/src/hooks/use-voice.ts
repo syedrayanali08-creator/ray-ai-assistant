@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { getVoiceStreamUrl } from "@/app/actions/voice";
+import type { VoiceCapabilities } from "@/lib/api";
 import {
   DEFAULT_WAKE_WORDS,
   TranscriptWakeWordDetector,
@@ -16,7 +18,12 @@ import {
  * states are the pipeline's real states, so the local faster-whisper/Piper/
  * openWakeWord backends can replace them without the UI changing:
  *
- *   idle → armed → listening → thinking → speaking → armed
+ *   idle -> armed -> listening -> thinking -> speaking -> armed
+ *
+ * When the backend reports `local_ready` with `stt_backend=local` and
+ * `tts_backend=local`, audio is sent to `/voice/stream` instead of the browser's
+ * cloud speech APIs. That path is push-to-talk for now; continuous wake-word
+ * streaming will land once openWakeWord client models are wired in.
  *
  * Note that `RAY_STT_BACKEND=browser` is not local: Chrome sends the captured
  * audio to Google for transcription (docs/12). That is why the control shows
@@ -66,8 +73,11 @@ function recognitionConstructor(): SpeechRecognitionConstructor | null {
 export interface UseVoiceOptions {
   /** Called with the user's request, wake word already stripped. */
   onRequest: (text: string) => void;
+  /** Called when the local voice pipeline returns a completed response. */
+  onResponse?: (request: string, content: string, speechText: string) => void;
   wakeWords?: readonly string[];
   wakeWordEnabled?: boolean;
+  capabilities?: VoiceCapabilities | null;
 }
 
 export interface Voice {
@@ -78,6 +88,8 @@ export interface Voice {
   lastWake: WakeEvent | null;
   error: string | null;
   speechEnabled: boolean;
+  /** True when the backend is running local STT/TTS and the browser can use it. */
+  localReady: boolean;
   toggleSpeech: () => void;
   /** Arm wake-word listening, or disarm it. */
   toggleArmed: () => void;
@@ -88,46 +100,132 @@ export interface Voice {
   speak: (text: string) => void;
 }
 
+type LocalMsg =
+  | { type: "state"; state: VoiceState }
+  | { type: "partial"; bytes: number }
+  | { type: "transcript"; text: string; language: string }
+  | { type: "response_text"; content: string; speech_text: string }
+  | { type: "audio"; data?: string; sample_rate?: number; is_final?: boolean; error?: string }
+  | { type: "wake"; phrase: string; confidence: number; detected_at: string }
+  | { type: "error"; message: string };
+
+function buildWavHeader(dataLength: number, sampleRate: number): ArrayBuffer {
+  const buffer = new ArrayBuffer(44);
+  const view = new DataView(buffer);
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i += 1) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + dataLength, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, dataLength, true);
+  return buffer;
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export function useVoice({
   onRequest,
+  onResponse,
   wakeWords = DEFAULT_WAKE_WORDS,
   wakeWordEnabled = false,
+  capabilities,
 }: UseVoiceOptions): Voice {
   const [state, setState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
+  const transcriptRef = useRef("");
   const [lastWake, setLastWake] = useState<WakeEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [speechEnabled, setSpeechEnabled] = useState(false);
 
+  const setTranscriptWithRef = useCallback((value: string | ((prev: string) => string)) => {
+    setTranscript((prev) => {
+      const next = typeof value === "function" ? value(prev) : value;
+      transcriptRef.current = next;
+      return next;
+    });
+  }, []);
+
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const detector = useMemo(() => new TranscriptWakeWordDetector(wakeWords), [wakeWords]);
-  // Wake mode keeps the microphone open and waits for the keyword; push-to-talk
-  // takes the whole utterance and then stops.
   const modeRef = useRef<"wake" | "push">("wake");
   const armedRef = useRef(false);
   const requestRef = useRef(onRequest);
+  const responseRef = useRef(onResponse);
   requestRef.current = onRequest;
+  responseRef.current = onResponse;
 
   // Capability is browser-only, so it cannot be read during render: the server
   // renders "unsupported" and the client would disagree, which is a hydration
   // mismatch. It resolves in an effect, after hydration.
   const [supported, setSupported] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [localReady, setLocalReady] = useState(false);
+
   useEffect(() => {
     setSupported(recognitionConstructor() !== null);
     setSpeechSupported(typeof window.speechSynthesis !== "undefined");
   }, []);
 
-  const stop = useCallback(() => {
+  useEffect(() => {
+    const ready =
+      capabilities?.local_ready === true &&
+      capabilities.stt_backend === "local" &&
+      capabilities.tts_backend === "local";
+    setLocalReady(ready ?? false);
+  }, [capabilities]);
+
+  // --- browser speech synthesis ------------------------------------------------
+  const speak = useCallback(
+    (text: string) => {
+      if (localReady || !speechEnabled || !speechSupported || text.trim() === "") return;
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      utterance.onstart = () => setState("speaking");
+      utterance.onend = () => setState(armedRef.current ? "armed" : "idle");
+      window.speechSynthesis.speak(utterance);
+    },
+    [speechEnabled, speechSupported, localReady],
+  );
+
+  const toggleSpeech = useCallback(() => {
+    setSpeechEnabled((enabled) => {
+      if (enabled) window.speechSynthesis.cancel();
+      return !enabled;
+    });
+  }, []);
+
+  // --- browser speech recognition ----------------------------------------------
+  const stopRecognition = useCallback(() => {
     armedRef.current = false;
     recognitionRef.current?.abort();
     recognitionRef.current = null;
     detector.reset();
-    setTranscript("");
+    setTranscriptWithRef("");
     setState("idle");
-  }, [detector]);
+  }, [detector, setTranscriptWithRef]);
 
-  const start = useCallback(
+  const startRecognition = useCallback(
     (mode: "wake" | "push") => {
       const Recognition = recognitionConstructor();
       if (Recognition === null) {
@@ -140,7 +238,7 @@ export function useVoice({
       modeRef.current = mode;
       armedRef.current = true;
       setError(null);
-      setTranscript("");
+      setTranscriptWithRef("");
 
       const recognition = new Recognition();
       recognition.continuous = mode === "wake";
@@ -156,7 +254,7 @@ export function useVoice({
           else interim += result[0].transcript;
         }
         const heard = `${final}${interim}`;
-        setTranscript(heard);
+        setTranscriptWithRef(heard);
 
         if (modeRef.current === "wake") {
           const wake = detector.feed(heard);
@@ -178,7 +276,7 @@ export function useVoice({
           return;
         }
 
-        setTranscript("");
+        setTranscriptWithRef("");
         detector.reset();
         setState("thinking");
         if (modeRef.current === "push") {
@@ -221,46 +319,278 @@ export function useVoice({
         setState("idle");
       }
     },
-    [detector],
+    [detector, setTranscriptWithRef],
   );
 
-  const toggleArmed = useCallback(() => {
-    if (state === "idle") start("wake");
-    else stop();
-  }, [state, start, stop]);
+  // --- local WebSocket voice pipeline ------------------------------------------
+  const wsRef = useRef<WebSocket | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioBufferRef = useRef<Uint8Array | null>(null);
+  const audioSampleRateRef = useRef<number>(22_050);
+  const pendingAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const pushToTalk = useCallback(() => {
-    if (state === "listening") stop();
-    else start("push");
-  }, [state, start, stop]);
+  const resetLocal = useCallback(() => {
+    if (recorderRef.current?.state !== "inactive") {
+      try {
+        recorderRef.current?.stop();
+      } catch {
+        // Already stopped.
+      }
+    }
+    recorderRef.current = null;
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      try {
+        wsRef.current.close();
+      } catch {
+        // Already closed.
+      }
+    }
+    wsRef.current = null;
+    audioBufferRef.current = null;
+    pendingAudioRef.current?.pause();
+    pendingAudioRef.current = null;
+  }, []);
 
-  const setThinking = useCallback((thinking: boolean) => {
-    setState((current) => {
-      if (thinking) return "thinking";
-      if (current === "thinking") return armedRef.current ? "armed" : "idle";
-      return current;
+  const playPcm = useCallback((pcm: Uint8Array, sampleRate: number) => {
+    const header = buildWavHeader(pcm.length, sampleRate);
+    const blob = new Blob([header, pcm], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    pendingAudioRef.current = audio;
+    audio.onplay = () => setState("speaking");
+    audio.onended = () => {
+      setState(armedRef.current ? "armed" : "idle");
+      URL.revokeObjectURL(url);
+      pendingAudioRef.current = null;
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      pendingAudioRef.current = null;
+    };
+    void audio.play().catch(() => {
+      // Autoplay blocked; leave it as a manual fallback later if needed.
     });
   }, []);
 
-  const speak = useCallback(
-    (text: string) => {
-      if (!speechEnabled || !speechSupported || text.trim() === "") return;
+  const handleLocalMessage = useCallback((message: LocalMsg) => {
+    switch (message.type) {
+      case "state":
+        setState(message.state);
+        break;
+      case "transcript":
+        setTranscriptWithRef(message.text);
+        break;
+      case "response_text": {
+        setTranscriptWithRef("");
+        responseRef.current?.(
+          transcriptRef.current,
+          message.content,
+          message.speech_text ?? message.content,
+        );
+        break;
+      }
+      case "audio": {
+        if (message.error) {
+          setError(message.error);
+          break;
+        }
+        if (message.data) {
+          const pcm = base64ToUint8Array(message.data);
+          if (message.sample_rate) audioSampleRateRef.current = message.sample_rate;
+          audioBufferRef.current = audioBufferRef.current
+            ? new Uint8Array([...audioBufferRef.current, ...pcm])
+            : pcm;
+        }
+        if (message.is_final && audioBufferRef.current) {
+          playPcm(audioBufferRef.current, audioSampleRateRef.current);
+          audioBufferRef.current = null;
+        }
+        break;
+      }
+      case "wake": {
+        setLastWake({
+          keyword: message.phrase,
+          confidence: message.confidence,
+          at: new Date(message.detected_at).getTime(),
+        });
+        setState("listening");
+        break;
+      }
+      case "error":
+        setError(message.message);
+        break;
+      default:
+        break;
+    }
+  }, [playPcm, setTranscriptWithRef]);
 
+  const startLocalTurn = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("This browser cannot record microphone audio.");
+      return;
+    }
+
+    resetLocal();
+    setError(null);
+    setTranscriptWithRef("");
+    audioBufferRef.current = null;
+
+    let url: string;
+    try {
+      const maybeUrl = await getVoiceStreamUrl();
+      if (!maybeUrl) {
+        setError("Voice stream is not configured.");
+        return;
+      }
+      url = maybeUrl;
+    } catch {
+      setError("Could not get a voice stream token.");
+      return;
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError("Microphone permission denied.");
+      return;
+    }
+
+    const ws = new WebSocket(url);
+    ws.binaryType = "arraybuffer";
+    wsRef.current = ws;
+
+    let started = false;
+    const chunks: Blob[] = [];
+
+    const recorder = new MediaRecorder(stream);
+    recorderRef.current = recorder;
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+
+    recorder.onstop = async () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        const blob = new Blob(chunks, { type: recorder.mimeType });
+        const buffer = await blob.arrayBuffer();
+        ws.send(buffer);
+        ws.send(JSON.stringify({ type: "stop" }));
+      }
+      stream.getTracks().forEach((track) => track.stop());
+    };
+
+    ws.onopen = () => {
+      started = true;
+      ws.send(JSON.stringify({ type: "start" }));
+      // 100 ms slices keep the HUD partial counter moving without fragmenting
+      // the webm too much.
+      recorder.start(100);
+      setState("listening");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string) as LocalMsg;
+        handleLocalMessage(data);
+      } catch {
+        // Ignore binary or malformed frames.
+      }
+    };
+
+    ws.onerror = () => {
+      setError("Voice stream failed. Falling back to browser speech.");
+      resetLocal();
+      setLocalReady(false);
+    };
+
+    ws.onclose = () => {
+      if (!started) {
+        setError("Voice stream closed before it opened.");
+      }
+      resetLocal();
+      setState(armedRef.current ? "armed" : "idle");
+    };
+  }, [resetLocal, handleLocalMessage, setTranscriptWithRef]);
+
+  const stopLocalTurn = useCallback(() => {
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.stop();
+    } else {
+      resetLocal();
+    }
+    setState("thinking");
+  }, [resetLocal]);
+
+  const bargeLocal = useCallback(() => {
+    pendingAudioRef.current?.pause();
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "barge" }));
+    }
+    resetLocal();
+    void startLocalTurn();
+  }, [resetLocal, startLocalTurn]);
+
+  // --- public controls ---------------------------------------------------------
+  const stop = useCallback(() => {
+    window.speechSynthesis.cancel();
+    if (localReady) {
+      resetLocal();
+      setState("idle");
+    } else {
+      stopRecognition();
+    }
+  }, [localReady, resetLocal, stopRecognition]);
+
+  const toggleArmed = useCallback(() => {
+    window.speechSynthesis.cancel();
+    if (localReady) {
+      if (state === "idle" || state === "armed") {
+        void startLocalTurn();
+      } else {
+        stopLocalTurn();
+      }
+      return;
+    }
+    if (state === "idle") startRecognition("wake");
+    else stopRecognition();
+  }, [localReady, startLocalTurn, stopLocalTurn, startRecognition, stopRecognition, state]);
+
+  const pushToTalk = useCallback(() => {
+    window.speechSynthesis.cancel();
+    if (localReady) {
+      if (state === "speaking") {
+        bargeLocal();
+      } else if (state === "listening" || state === "thinking") {
+        stopLocalTurn();
+      } else {
+        void startLocalTurn();
+      }
+      return;
+    }
+    if (state === "speaking") {
+      // Barge in on a spoken reply and start a fresh push-to-talk turn.
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.05;
-      utterance.onstart = () => setState("speaking");
-      utterance.onend = () => setState(armedRef.current ? "armed" : "idle");
-      window.speechSynthesis.speak(utterance);
-    },
-    [speechEnabled, speechSupported],
-  );
+      setState("idle");
+      startRecognition("push");
+    } else if (state === "listening") {
+      stopRecognition();
+    } else {
+      startRecognition("push");
+    }
+  }, [localReady, bargeLocal, stopLocalTurn, startLocalTurn, startRecognition, stopRecognition, state]);
 
-  const toggleSpeech = useCallback(() => {
-    setSpeechEnabled((enabled) => {
-      if (enabled) window.speechSynthesis.cancel();
-      return !enabled;
-    });
+  const setThinking = useCallback((thinking: boolean) => {
+    if (thinking) {
+      setState("thinking");
+    } else {
+      setState((current) => {
+        if (current === "thinking") return armedRef.current ? "armed" : "idle";
+        return current;
+      });
+    }
   }, []);
 
   // Arming needs a user gesture for microphone permission, so a backend that
@@ -275,11 +605,12 @@ export function useVoice({
 
   return {
     state,
-    supported,
+    supported: supported || (localReady && typeof window !== "undefined" && typeof MediaRecorder !== "undefined"),
     transcript,
     lastWake,
     error,
     speechEnabled: speechEnabled && speechSupported,
+    localReady,
     toggleSpeech,
     toggleArmed,
     pushToTalk,

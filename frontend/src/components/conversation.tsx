@@ -39,12 +39,15 @@ export function Conversation({
 
   const voice = useVoice({
     onRequest: (text) => send(text, true),
+    onResponse: (request, content, speechText) => chat.appendVoiceResponse(request, content, speechText),
     wakeWordEnabled: health?.voice?.wake_word_enabled ?? false,
+    capabilities: health?.voice ?? null,
   });
 
   // The voice indicator tracks the request, not just the microphone.
+  // In local voice mode the WebSocket drives states itself.
   useEffect(() => {
-    voice.setThinking(chat.sending);
+    if (!voice.localReady) voice.setThinking(chat.sending);
   }, [chat.sending, voice.setThinking, voice]);
 
   // Speak each answer once, using the spoken variant rather than the markdown.

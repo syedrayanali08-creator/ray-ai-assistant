@@ -3936,6 +3936,27 @@
             "type": "string",
             "title": "Wake Word Phrase",
             "default": "Ray"
+          },
+          "wake_words": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Wake Words",
+            "default": [
+              "ray",
+              "jarvis"
+            ]
+          },
+          "local_ready": {
+            "type": "boolean",
+            "title": "Local Ready",
+            "default": false
+          },
+          "local_detail": {
+            "type": "string",
+            "title": "Local Detail",
+            "default": ""
           }
         },
         "type": "object",
