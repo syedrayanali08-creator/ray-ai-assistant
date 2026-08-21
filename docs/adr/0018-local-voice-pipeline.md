@@ -23,9 +23,12 @@ The design must:
 Voice providers live in `ray/voice/providers/local.py` behind lazy optional imports:
 
 * `LocalSpeechToText` loads `faster-whisper` when the model files are present.
-* `LocalTextToSpeech` loads `piper` and a voice model on first synthesis.
-* `LocalWakeWord` exposes an `openwakeword`-compatible interface, but the heavy model is
-  only required when continuous server-side wake-word listening is enabled.
+* `LocalTextToSpeech` loads `piper` and a voice model on first synthesis; relative voice
+  paths are resolved against `voice_models_dir`.
+* `LocalWakeWord` prefers an `openwakeword` `.tflite` model when one is configured and
+  present. When it is absent, it falls back to a tiny `faster-whisper` keyword spotter that
+  runs on 1.5-second sliding windows, so "Ray" and "Jarvis" activate the assistant without
+  any dedicated wake-word dependency.
 
 A `VoiceManager` reports `VoiceCapabilities` (`stt_backend`, `tts_backend`,
 `wake_words`, `local_ready`, `local_detail`) so the frontend can switch between the
@@ -38,10 +41,11 @@ States (`armed`, `listening`, `thinking`, `speaking`) are pushed to the client s
 reflects the real pipeline state. Barge-in cancels the current response and starts a new
 listening turn.
 
-For V1, the client wake-word loop remains transcript-based and runs in the browser; the
-server-side `LocalWakeWord` provider is reserved for the always-listening model path that
-`openwakeword` would power once its wheel issues are resolved. Both paths use the same
-abstract `WakeWordDetector` interface, so swapping them does not touch the core pipeline.
+For V1, the client wake-word loop can run in the browser (`SpeechRecognition`) or on the
+server (`LocalWakeWord`). The server-side provider uses `openwakeword` when a `.tflite`
+model is configured; otherwise it uses a `faster-whisper` keyword spotter so the
+experience is usable without the missing wheel. Both paths use the same abstract
+`WakeWordDetector` interface, so swapping implementations does not touch the core pipeline.
 
 `wake_words` is a configuration list defaulting to `["ray", "jarvis"]`; the UI and the
 wake-word detector render/use it without hardcoding a single keyword.
@@ -58,9 +62,9 @@ wake-word detector render/use it without hardcoding a single keyword.
 ## Consequences
 
 * The `voice` dependency group in `pyproject.toml` is optional; users enable it with
-  `uv sync --group voice` and must download models separately.
+  `uv sync --group voice` and download models with `uv run python scripts/download_voice_models.py`.
 * `openwakeword` is not pinned in the default `voice` group because of the wheel
-  incompatibility; a working manual install path is documented.
+  incompatibility, but the keyword spotter fallback means wake word is usable out of the box.
 * The frontend uses `MediaRecorder` and the Web Audio stack; browser codec support
   (WebM/Opus) is normalized to 16 kHz PCM on the server using `ffmpeg`.
 * Wake-word state and barge-in are explicit and testable through the WebSocket protocol.

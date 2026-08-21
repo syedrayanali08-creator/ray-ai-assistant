@@ -4,11 +4,22 @@ Every setting comes from the environment (ADR-0012). Nothing is hardcoded and no
 secret ever lives in source.
 """
 
+import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BeforeValidator, Field
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+
+def _parse_list(value: Any) -> Any:
+    """Support JSON arrays or comma-separated strings for list settings."""
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith("["):
+            return json.loads(value)
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return value
 
 
 class Settings(BaseSettings):
@@ -81,14 +92,21 @@ class Settings(BaseSettings):
     # faster-whisper model size ("tiny", "base", "small" ...) or path to a converted model.
     stt_model: str = "tiny"
     stt_language: str | None = None
-    # Path to a Piper .onnx voice model. Empty means TTS is unavailable.
-    tts_voice: str = ""
+    # Directory where downloaded Piper/openWakeWord models live. TTS resolves a
+    # relative tts_voice against this directory.
+    voice_models_dir: str = "~/.local/share/ray/voices"
+    # Path to a Piper .onnx voice model. A bare filename is resolved inside voice_models_dir.
+    tts_voice: str = "en_US-lessac-low.onnx"
     tts_length_scale: float = 1.0
     # Path to an openWakeWord .tflite model. Empty disables server-side wake word.
     wake_word_model: str = ""
-    wake_words: list[str] = Field(default_factory=lambda: ["ray", "jarvis"])
+    wake_words: Annotated[list[str], NoDecode, BeforeValidator(_parse_list)] = Field(
+        default_factory=lambda: ["ray", "jarvis"]
+    )
 
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: Annotated[list[str], NoDecode, BeforeValidator(_parse_list)] = Field(
+        default_factory=lambda: ["http://localhost:3000"]
+    )
 
     @property
     def is_development(self) -> bool:
