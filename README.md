@@ -6,10 +6,11 @@ already lives in — calendar, GitHub, notes, and local files.
 
 Ray is built for one person, runs locally, and costs nothing to operate.
 
-> **Status: Phase 1 — foundation.** The database, API, auth, agent registry, voice
-> interfaces, and dashboard shell are in place and talking to each other. Conversation
-> (Phase 2) is next; see the [roadmap](docs/10%20Development%20Roadmap.md). All technical
-> decisions are recorded in [`/docs/adr`](docs/adr/).
+> **Status: Phase 6 — voice hardening.** Phases 1–5 (foundation, conversation, memory,
+> agents, productivity/integrations) are merged. Local faster-whisper + Piper STT/TTS and
+> a wake-word keyword fallback now work out of the box with one download script. The next
+> phase is the Advanced Dashboard (Phase 7). See the
+> [roadmap](docs/10%20Development%20Roadmap.md) and [`/docs/adr`](docs/adr/) for details.
 
 ---
 
@@ -134,6 +135,30 @@ Voice needs a Chromium-based browser and a microphone permission granted from a 
 `browser` speech recognition sends the audio to Google, which is why the control names
 the active backend (`docs/12`). Everything works without a microphone — voice is an
 input, not a requirement.
+
+#### Running voice locally (no cloud STT/TTS)
+
+Install the optional voice dependencies and download the models once:
+
+```bash
+cd backend
+uv sync --group voice
+uv run python scripts/download_voice_models.py   # caches ~/.local/share/ray/voices
+```
+
+Then set in `.env`:
+
+```bash
+RAY_STT_BACKEND=local
+RAY_TTS_BACKEND=local
+RAY_WAKE_WORD_ENABLED=true
+```
+
+`download_voice_models.py` fetches a small Piper voice model and pre-loads the Whisper
+`tiny` model so first use is fast. Server-side wake word works without `openwakeword`:
+Ray runs a tiny faster-whisper keyword spotter on the microphone stream, so "Ray" or
+"Jarvis" activates even when no dedicated `.tflite` wake model is installed. A real
+openWakeWord model can be configured with `RAY_WAKE_WORD_MODEL` when it is available.
 
 Under each answer, the collapsed trace line shows what actually happened: which agent
 answered, which provider was used, how many memories were retrieved, and whether a

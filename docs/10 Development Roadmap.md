@@ -201,8 +201,8 @@ Deliver the voice-first experience properly.
 
 ## Status
 
-Implemented. The local pipeline is complete but requires optional models; the browser
-fallback remains available by default.
+**Hardened and merge-ready.** Local STT/TTS/wake are genuinely usable and can be set up
+with one download script. The browser fallback remains available by default.
 
 ## Tasks
 
@@ -211,6 +211,9 @@ fallback remains available by default.
 * [x] `/voice/stream` WebSocket for post-activation audio
 * [x] Listening / Processing / Responding states in the UI
 * [x] Latency tuning on the spoken path
+* [x] `scripts/download_voice_models.py` to fetch Piper and pre-load Whisper
+* [x] `voice_models_dir` setting so relative `tts_voice` paths resolve correctly
+* [x] Wake-word keyword fallback using faster-whisper when `openwakeword` is unavailable
 
 ## Sub-phase 6b — Wake Word
 
@@ -220,9 +223,12 @@ fallback remains available by default.
   phrase fired); the spoken persona stays "Ray"
 * [x] Always-listening indicator and a revocable microphone permission
 * [x] Barge-in (interrupting Ray while it speaks)
+* [x] Usable server-side keyword fallback without a dedicated wake-word model
 
 ## Completion Criteria
 
+* [x] `uv run python scripts/download_voice_models.py` downloads the required voice model(s)
+  and the local STT/TTS pipeline runs
 * [x] the user says "Ray" or "Jarvis", speaks a request, and hears a natural spoken answer
 * [x] the wake word runs locally and no audio leaves the machine before activation
 

@@ -61,12 +61,15 @@ class VoiceManager:
         return LocalTextToSpeech(
             voice_path=self.settings.tts_voice,
             length_scale=self.settings.tts_length_scale,
+            voice_models_dir=self.settings.voice_models_dir,
         )
 
     def _build_wake(self) -> LocalWakeWord:
         return LocalWakeWord(
             model_path=self.settings.wake_word_model,
             keywords=self.settings.wake_words,
+            stt_model=self.settings.stt_model,
+            stt_language=self.settings.stt_language,
         )
 
     def info(self) -> VoiceCapabilities:

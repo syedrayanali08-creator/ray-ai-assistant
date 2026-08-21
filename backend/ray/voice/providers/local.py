@@ -30,25 +30,36 @@ from ray.voice.base import (
 
 # Optional heavy dependencies. They are only loaded when the user opts into the local
 # voice stack; failing to import must not break the default install.
+np: Any = None
 try:
-    import numpy as np
+    import numpy as _np
+    np = _np
 except Exception:  # pragma: no cover - CI without the voice group
-    np = None
+    pass
 
+WhisperModel: Any = None
 try:
-    from faster_whisper import WhisperModel
+    from faster_whisper import WhisperModel as _WhisperModel
+    WhisperModel = _WhisperModel
 except Exception:  # pragma: no cover
-    WhisperModel = None
+    pass
 
+PiperVoice: Any = None
+SynthesisConfig: Any = None
 try:
-    from piper import PiperVoice
+    from piper import PiperVoice as _PiperVoice
+    from piper.config import SynthesisConfig as _SynthesisConfig
+    PiperVoice = _PiperVoice
+    SynthesisConfig = _SynthesisConfig
 except Exception:  # pragma: no cover
-    PiperVoice = None
+    pass
 
+OpenWakeWordModel: Any = None
 try:
-    from openwakeword.model import Model as OpenWakeWordModel
+    from openwakeword.model import Model as _OpenWakeWordModel
+    OpenWakeWordModel = _OpenWakeWordModel
 except Exception:  # pragma: no cover
-    OpenWakeWordModel = None
+    pass
 
 
 class _Lazy:
@@ -188,17 +199,33 @@ class LocalTextToSpeech:
 
     name = "local"
 
-    def __init__(self, voice_path: str = "", length_scale: float = 1.0) -> None:
+    def __init__(
+        self,
+        voice_path: str = "",
+        length_scale: float = 1.0,
+        voice_models_dir: str = "",
+    ) -> None:
         self.voice_path = voice_path
         self.length_scale = length_scale
+        self.voice_models_dir = voice_models_dir
         self._voice: _Lazy | None = None
+
+    def _resolved_voice_path(self) -> Path:
+        if not self.voice_path:
+            return Path("")
+        expanded = Path(os.path.expanduser(self.voice_path))
+        if expanded.is_absolute() or not self.voice_models_dir:
+            return expanded
+        models_dir = Path(os.path.expanduser(self.voice_models_dir))
+        return models_dir / expanded
 
     def _load(self) -> Any:
         if PiperVoice is None:
             raise VoiceError("piper-tts is not installed. Run: uv sync --group voice")
-        if not self.voice_path or not Path(self.voice_path).exists():
-            raise VoiceError(f"Piper voice model not found: {self.voice_path}")
-        return PiperVoice.load(self.voice_path)
+        voice_path = self._resolved_voice_path()
+        if not voice_path.exists():
+            raise VoiceError(f"Piper voice model not found: {voice_path}")
+        return PiperVoice.load(str(voice_path))
 
     async def synthesize(self, request: SpeechRequest) -> AsyncIterator[AudioChunk]:
         if not request.text.strip():
@@ -210,47 +237,80 @@ class LocalTextToSpeech:
         voice = await asyncio.to_thread(self._voice.get)
 
         def _stream() -> Iterator[AudioChunk]:
-            for chunk in voice.synthesize(request.text, length_scale=self.length_scale):
+            cfg = SynthesisConfig(length_scale=self.length_scale / max(request.speed, 0.1))
+            sample_rate = 22_050
+            for chunk in voice.synthesize(request.text, syn_config=cfg):
+                sample_rate = chunk.sample_rate
                 yield AudioChunk(
                     data=chunk.audio_int16_bytes,
-                    sample_rate=chunk.sample_rate,
+                    sample_rate=sample_rate,
                     is_final=False,
                 )
-            yield AudioChunk(data=b"", sample_rate=22_050, is_final=True)
+            yield AudioChunk(data=b"", sample_rate=sample_rate, is_final=True)
 
         # Piper is CPU-bound; run off the event loop.
         for audio_chunk in await asyncio.to_thread(list, _stream()):
             yield audio_chunk
 
     async def available_voices(self) -> list[str]:
-        exists = await asyncio.to_thread(lambda: os.path.exists(self.voice_path))
-        if self.voice_path and exists:
-            return [self.voice_path]
+        voice_path = self._resolved_voice_path()
+        exists = await asyncio.to_thread(lambda: voice_path.exists())
+        if voice_path and exists:
+            return [str(voice_path)]
         return []
 
     def info(self) -> VoiceProviderInfo:
         if PiperVoice is None:
             return VoiceProviderInfo("local_tts", False, "piper-tts is not installed")
+        voice_path = self._resolved_voice_path()
         if not self.voice_path:
             return VoiceProviderInfo("local_tts", False, "tts_voice model path is not configured")
-        if not Path(self.voice_path).exists():
+        if not voice_path.exists():
             return VoiceProviderInfo(
-                "local_tts", False, f"Piper voice model not found: {self.voice_path}"
+                "local_tts", False, f"Piper voice model not found: {voice_path}"
             )
-        return VoiceProviderInfo("local_tts", True, f"voice={Path(self.voice_path).name}")
+        return VoiceProviderInfo("local_tts", True, f"voice={voice_path.name}")
 
 
 class LocalWakeWord(WakeWordDetector):
-    """openWakeWord running server-side for the local voice WebSocket."""
+    """Server-side wake-word detector.
+
+    Prefer openWakeWord when a model is available. Otherwise fall back to a tiny
+    faster-whisper keyword spotter so the wake-word path works locally without
+    installing openwakeword wheels.
+    """
 
     name = "local"
 
-    def __init__(self, model_path: str = "", keywords: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        model_path: str = "",
+        keywords: list[str] | None = None,
+        stt_model: str = "tiny",
+        stt_language: str | None = None,
+    ) -> None:
         self.model_path = model_path
         self.keywords = [k.lower() for k in (keywords or ["ray", "jarvis"])]
+        self.stt_model = stt_model
+        self.stt_language = stt_language
         self._model: _Lazy | None = None
+        self._stt: LocalSpeechToText | None = None
         self._last_detection: float = 0.0
         self._debounce_seconds = 1.0
+        self._buffer = bytearray()
+        # Process 1.5 s windows, advancing 1.0 s each time, at 16 kHz 16-bit mono.
+        self._window_bytes = int(1.5 * 16_000 * 2)
+        self._step_bytes = int(1.0 * 16_000 * 2)
+
+    def _use_openwakeword(self) -> bool:
+        return (
+            OpenWakeWordModel is not None
+            and bool(self.model_path)
+            and Path(self.model_path).exists()
+        )
+
+    def _use_stt(self) -> bool:
+        return not self._use_openwakeword() and WhisperModel is not None
 
     def _load(self) -> Any:
         if OpenWakeWordModel is None:
@@ -259,9 +319,22 @@ class LocalWakeWord(WakeWordDetector):
             raise VoiceError(f"openWakeWord model not found: {self.model_path}")
         return OpenWakeWordModel(wakeword_models=[self.model_path])
 
+    def _get_stt(self) -> LocalSpeechToText:
+        if self._stt is None:
+            self._stt = LocalSpeechToText(
+                model_name=self.stt_model,
+                language=self.stt_language,
+            )
+        return self._stt
+
     async def feed(self, audio: bytes, *, sample_rate: int = 16_000) -> WakeEvent | None:
-        if not self.model_path:
-            return None
+        if self._use_openwakeword():
+            return await self._feed_openwakeword(audio, sample_rate)
+        if self._use_stt():
+            return await self._feed_stt(audio, sample_rate)
+        return None
+
+    async def _feed_openwakeword(self, audio: bytes, sample_rate: int) -> WakeEvent | None:
         if np is None:
             raise VoiceError("numpy is not installed")
 
@@ -292,13 +365,41 @@ class LocalWakeWord(WakeWordDetector):
         if matched is None:
             return None
 
+        return self._make_event(matched[0], matched[1])
+
+    async def _feed_stt(self, audio: bytes, sample_rate: int) -> WakeEvent | None:
+        stt = self._get_stt()
+        self._buffer.extend(audio)
+
+        while len(self._buffer) >= self._window_bytes:
+            window = bytes(self._buffer[: self._window_bytes])
+            try:
+                wav = _ensure_wav(window, sample_rate)
+            except Exception:
+                wav = await _ffmpeg_to_wav(window)
+            transcript = await stt.transcribe(wav, sample_rate=sample_rate)
+            text = transcript.text.strip().lower().rstrip(",.!?")
+            parts = text.split()
+            for keyword in self.keywords:
+                if parts and keyword in parts[0]:
+                    self._buffer.clear()
+                    return self._make_event(keyword, transcript.confidence)
+
+            # Advance by the step size, keeping overlap for phrases that cross windows.
+            advance = min(self._step_bytes, len(self._buffer))
+            self._buffer = self._buffer[advance:]
+
+        return None
+
+    def _make_event(self, phrase: str, confidence: float) -> WakeEvent | None:
         now = datetime.now(UTC).timestamp()
         if now - self._last_detection < self._debounce_seconds:
             return None
         self._last_detection = now
-        return WakeEvent(phrase=matched[0], confidence=matched[1], detected_at=datetime.now(UTC))
+        return WakeEvent(phrase=phrase, confidence=confidence, detected_at=datetime.now(UTC))
 
     async def reset(self) -> None:
+        self._buffer.clear()
         if self._model is not None:
             try:
                 model = await asyncio.to_thread(self._model.get)
@@ -307,8 +408,22 @@ class LocalWakeWord(WakeWordDetector):
                 pass
 
     def info(self) -> VoiceProviderInfo:
+        if self._use_openwakeword():
+            return VoiceProviderInfo("local_wake", True, f"model={Path(self.model_path).name}")
+        if self._use_stt():
+            return VoiceProviderInfo(
+                "local_wake",
+                True,
+                f"keyword STT fallback (model={self.stt_model})",
+            )
+        if OpenWakeWordModel is None and WhisperModel is None:
+            return VoiceProviderInfo(
+                "local_wake", False, "openwakeword and faster-whisper are not installed"
+            )
         if OpenWakeWordModel is None:
-            return VoiceProviderInfo("local_wake", False, "openwakeword is not installed")
+            return VoiceProviderInfo(
+                "local_wake", False, "openwakeword not installed; no wake model configured"
+            )
         if not self.model_path:
             return VoiceProviderInfo("local_wake", False, "wake_word_model path is not configured")
         if not Path(self.model_path).exists():
