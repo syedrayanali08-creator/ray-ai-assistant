@@ -281,8 +281,12 @@ async def test_integration_crud_and_health_check(session: AsyncSession, user) ->
     assert not created.enabled
     assert created.status == IntegrationStatus.DISCONNECTED
 
-    # Expose safe fields only.
-    assert "credentials" not in created.model_dump_json().lower()
+    # Expose safe fields only: references are OK, raw secret values are not.
+    json_out = created.model_dump_json().lower()
+    assert '"credentials":' not in json_out
+    assert "api_key" not in json_out
+    assert "token" not in json_out
+    assert created.credentials_reference is None
 
     updated = await integration_service.update_integration(
         session,

@@ -6,10 +6,11 @@ already lives in — calendar, GitHub, notes, and local files.
 
 Ray is built for one person, runs locally, and costs nothing to operate.
 
-> **Status: Phase 6 — voice hardening.** Phases 1–5 (foundation, conversation, memory,
-> agents, productivity/integrations) are merged. Local faster-whisper + Piper STT/TTS and
-> a wake-word keyword fallback now work out of the box with one download script. The next
-> phase is the Advanced Dashboard (Phase 7). See the
+> **Status: Phase 8 — self improvement and hardening.** Phases 1–7 (foundation,
+> conversation, memory, agents, productivity/integrations, voice hardening, advanced
+> dashboard) are merged. Ray now has structured logging with secret redaction, a
+> self-diagnosis endpoint, an improvement-task capture flow, a settings UI for profile and
+> preferences, full JSON data export, and release-tagging automation. See the
 > [roadmap](docs/10%20Development%20Roadmap.md) and [`/docs/adr`](docs/adr/) for details.
 
 ---
@@ -180,6 +181,14 @@ anything; deleting takes effect on Ray's very next answer.
 Embeddings run locally. Install the model backend with `uv sync --group embeddings`
 (~2 GB of torch); without it Ray falls back to a dependency-free hashing embedder that
 matches on shared words rather than meaning ([ADR-0016](docs/adr/0016-embedding-backend-fallback.md)).
+
+### Health, export, and releases
+
+* `GET /health` returns a compact diagnostics map (database, LLM, voice, integrations).
+* `GET /system/diagnostics` gives a detailed self-diagnosis with actionable suggestions.
+* `GET /system/export` returns a complete, user-owned JSON snapshot of all Ray data.
+* `backend/scripts/release.py` bumps the version across `pyproject.toml`, `ray/version.py`,
+  and `frontend/package.json`, prepends the changelog, and optionally tags the release.
 
 Streaming can also be watched from the terminal:
 

@@ -35,7 +35,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Current User */
+        patch: operations["update_current_user_auth_user_patch"];
         trace?: never;
     };
     "/dashboard": {
@@ -656,6 +657,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diagnostics */
+        get: operations["diagnostics_system_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Data
+         * @description Return a complete, user-owned snapshot of Ray data.
+         *
+         *     Secrets are not included: ``credentials_reference`` is the *name* of an env var
+         *     or keyring key, not the value (docs/12).
+         */
+        get: operations["export_data_system_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -832,10 +873,52 @@ export interface components {
             overdue_count: number;
         };
         /**
+         * DiagnosticsResponse
+         * @description Detailed self-diagnosis for the UI /settings page and CLI.
+         */
+        DiagnosticsResponse: {
+            /** Overall */
+            overall: string;
+            /** Checks */
+            checks: {
+                [key: string]: string;
+            };
+            /** Suggestions */
+            suggestions: string[];
+        };
+        /**
          * EventSource
          * @enum {string}
          */
         EventSource: "ray" | "google" | "ics" | "notion";
+        /**
+         * ExportSnapshot
+         * @description A complete, user-owned data export (docs/12, docs/13).
+         */
+        ExportSnapshot: {
+            /** Version */
+            version: string;
+            /**
+             * Exported At
+             * Format: date-time
+             */
+            exported_at: string;
+            user: components["schemas"]["UserRead"];
+            /** Memories */
+            memories: components["schemas"]["MemoryRead"][];
+            /** Projects */
+            projects: components["schemas"]["ProjectRead"][];
+            /** Tasks */
+            tasks: components["schemas"]["TaskRead"][];
+            /** Events */
+            events: components["schemas"]["CalendarEventRead"][];
+            /** Integrations */
+            integrations: components["schemas"]["IntegrationRead"][];
+            /** Tool Permissions */
+            tool_permissions: components["schemas"]["ToolPermissionRead"][];
+            /** Conversations */
+            conversations: components["schemas"]["ConversationRead"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -852,6 +935,10 @@ export interface components {
             /** Llm Provider */
             llm_provider: string;
             voice: components["schemas"]["VoiceCapabilities"];
+            /** Diagnostics */
+            diagnostics?: {
+                [key: string]: string;
+            };
         };
         /** IntegrationCheck */
         IntegrationCheck: {
@@ -890,6 +977,8 @@ export interface components {
             /** Enabled */
             enabled: boolean;
             status: components["schemas"]["IntegrationStatus"];
+            /** Credentials Reference */
+            credentials_reference: string | null;
             /** Config */
             config: {
                 [key: string]: unknown;
@@ -1273,6 +1362,12 @@ export interface components {
             /** Decided At */
             decided_at: string | null;
         };
+        /** ToolPermissionRead */
+        ToolPermissionRead: {
+            /** Tool Name */
+            tool_name: string;
+            mode: components["schemas"]["PermissionMode"];
+        };
         /** ToolPermissionUpdate */
         ToolPermissionUpdate: {
             mode: components["schemas"]["PermissionMode"];
@@ -1301,6 +1396,21 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** UserUpdate */
+        UserUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Preferences */
+            preferences?: {
+                [key: string]: unknown;
+            } | null;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1399,6 +1509,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+        };
+    };
+    update_current_user_auth_user_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2697,6 +2840,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diagnostics_system_diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticsResponse"];
+                };
+            };
+        };
+    };
+    export_data_system_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportSnapshot"];
                 };
             };
         };

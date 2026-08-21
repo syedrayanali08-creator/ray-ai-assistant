@@ -279,12 +279,19 @@ Make Ray easy to keep improving, and safe to rely on.
 
 ## Tasks
 
-* Structured logging, error taxonomy, and secret redaction
-* Integration health checks with self-diagnosis messaging
-* "Ray, this workflow is annoying" → improvement task flow (`docs/04`)
-* Configuration management UI
-* Full data export and backup
-* Release tagging and changelog per `docs/13`
+* [x] Structured logging, error taxonomy, and secret redaction (`ray/logging_config.py`, `ray/services/errors.py`)
+* [x] Integration health checks with self-diagnosis messaging (`/health` diagnostics map, `/system/diagnostics`)
+* [x] "Ray, this workflow is annoying" → improvement task flow (`feedback.create_improvement_task`, `docs/04`)
+* [x] Configuration management UI (`/settings` profile, preferences, and settings editor)
+* [x] Full data export and backup (`/system/export`, download JSON from `/settings`)
+* [x] Release tagging and changelog per `docs/13` (`backend/scripts/release.py`, `CHANGELOG.md`, `ray/version.py`)
+
+## Completion Criteria
+
+* [x] all backend checks pass (ruff, mypy, lint-imports, pytest)
+* [x] all frontend checks pass (lint, typecheck, vitest, build)
+* [x] OpenAPI and API types regenerated from the updated schema
+* [x] README/setup docs cover the new voice setup and export/diagnostics paths where relevant
 
 ---
 

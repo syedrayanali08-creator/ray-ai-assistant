@@ -37,6 +37,7 @@ class HealthResponse(BaseModel):
     database: str
     llm_provider: str
     voice: "VoiceCapabilities"
+    diagnostics: dict[str, str] = Field(default_factory=dict)
 
 
 class VoiceCapabilities(BaseModel):
@@ -63,6 +64,13 @@ class UserRead(ORMModel):
     preferences: dict[str, object]
     settings: dict[str, object]
     created_at: datetime
+
+
+class UserUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    email: str | None = Field(default=None, max_length=320)
+    preferences: dict[str, object] | None = None
+    settings: dict[str, object] | None = None
 
 
 class ProjectRead(ORMModel):
@@ -337,6 +345,8 @@ class IntegrationRead(ORMModel):
     provider: str
     enabled: bool
     status: IntegrationStatus
+    # Reference to an env var or keyring entry, never the secret itself (docs/12).
+    credentials_reference: str | None
     config: dict[str, object]
     last_sync: datetime | None
     last_error: str | None
@@ -357,6 +367,29 @@ class IntegrationUpdate(BaseModel):
     enabled: bool | None = None
     credentials_reference: str | None = Field(default=None, max_length=200)
     config: dict[str, object] | None = None
+
+
+class DiagnosticsResponse(BaseModel):
+    """Detailed self-diagnosis for the UI /settings page and CLI."""
+
+    overall: str
+    checks: dict[str, str]
+    suggestions: list[str]
+
+
+class ExportSnapshot(BaseModel):
+    """A complete, user-owned data export (docs/12, docs/13)."""
+
+    version: str
+    exported_at: datetime
+    user: UserRead
+    memories: list[MemoryRead]
+    projects: list[ProjectRead]
+    tasks: list[TaskRead]
+    events: list[CalendarEventRead]
+    integrations: list[IntegrationRead]
+    tool_permissions: list[ToolPermissionRead]
+    conversations: list[ConversationRead]
 
 
 class IntegrationCheck(BaseModel):

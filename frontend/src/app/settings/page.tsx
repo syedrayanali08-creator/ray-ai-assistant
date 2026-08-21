@@ -13,9 +13,12 @@ import {
   providersForType,
   updateIntegration,
   type Integration,
+  type IntegrationCreate,
   type IntegrationType,
 } from "@/lib/integrations";
 import { listPermissions, listTools, MODES, updatePermission, type PermissionMode, type ToolInfo, type ToolPermission } from "@/lib/tools";
+import { exportData, getDiagnostics, type Diagnostics } from "@/lib/system";
+import { getCurrentUser, updateCurrentUser, type User, type UserUpdate } from "@/lib/user";
 
 const PROVIDER_LABELS: Record<string, string> = {
   github: "GitHub",
@@ -36,6 +39,8 @@ export default function SettingsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [permissions, setPermissions] = useState<ToolPermission[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,17 +49,32 @@ export default function SettingsPage() {
   const [config, setConfig] = useState<Record<string, string>>({});
   const [credentials, setCredentials] = useState("");
 
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [preferencesJson, setPreferencesJson] = useState("{}");
+  const [settingsJson, setSettingsJson] = useState("{}");
+
   const load = async () => {
     setLoading(true);
     try {
-      const [integrationsData, toolsData, permissionsData] = await Promise.all([
+      const [integrationsData, toolsData, permissionsData, userData, diagnosticsData] = await Promise.all([
         listIntegrations(),
         listTools(),
         listPermissions(),
+        getCurrentUser().catch(() => null),
+        getDiagnostics().catch(() => null),
       ]);
       setIntegrations(integrationsData);
       setTools(toolsData);
       setPermissions(permissionsData);
+      setDiagnostics(diagnosticsData);
+      setUser(userData);
+      if (userData) {
+        setName(userData.name);
+        setEmail(userData.email ?? "");
+        setPreferencesJson(JSON.stringify(userData.preferences ?? {}, null, 2));
+        setSettingsJson(JSON.stringify(userData.settings ?? {}, null, 2));
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load settings");
@@ -74,13 +94,14 @@ export default function SettingsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createIntegration({
+    const body: IntegrationCreate = {
       type,
       provider,
       enabled: true,
       credentials_reference: credentials.trim() || null,
       config,
-    });
+    };
+    await createIntegration(body);
     setCredentials("");
     setConfig({});
     await load();
@@ -106,6 +127,50 @@ export default function SettingsPage() {
     await load();
   };
 
+  const parseJson = (text: string): Record<string, unknown> | null => {
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const preferences = parseJson(preferencesJson);
+    const settings = parseJson(settingsJson);
+    if (preferences === null || settings === null) {
+      setError("Preferences and settings must be valid JSON objects.");
+      return;
+    }
+    const payload: UserUpdate = {
+      name: name.trim() || null,
+      email: email.trim() || null,
+      preferences,
+      settings,
+    };
+    await updateCurrentUser(payload);
+    await load();
+  };
+
+  const handleExport = async () => {
+    const snapshot = await exportData();
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const date = new Date().toISOString().split("T")[0];
+    link.href = url;
+    link.download = `ray-export-${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const configFields = (selectedProvider: string) => {
     if (type === "files") return [{ key: "allowed_paths", label: "Allowed directories (comma-separated)" }];
     if (type === "knowledge" && selectedProvider === "obsidian") return [{ key: "vault_path", label: "Vault path" }];
@@ -118,6 +183,102 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
 
       {error && <p className="rounded-md bg-hud-danger/10 p-3 text-sm text-hud-danger">{error}</p>}
+
+      <Panel title="Profile & preferences">
+        {user === null ? (
+          <EmptyState>Loading profile...</EmptyState>
+        ) : (
+          <form onSubmit={handleSaveProfile} className="flex flex-col gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name"
+                className="rounded-md border border-hud-border bg-hud-panel px-3 py-2 text-sm text-hud-text outline-none placeholder:text-hud-muted focus:border-hud-accent"
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                className="rounded-md border border-hud-border bg-hud-panel px-3 py-2 text-sm text-hud-text outline-none placeholder:text-hud-muted focus:border-hud-accent"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs text-hud-muted">Preferences (JSON)</label>
+                <textarea
+                  value={preferencesJson}
+                  onChange={(e) => setPreferencesJson(e.target.value)}
+                  rows={6}
+                  className="w-full rounded-md border border-hud-border bg-hud-panel px-3 py-2 font-mono text-xs text-hud-text outline-none focus:border-hud-accent"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-hud-muted">Settings (JSON)</label>
+                <textarea
+                  value={settingsJson}
+                  onChange={(e) => setSettingsJson(e.target.value)}
+                  rows={6}
+                  className="w-full rounded-md border border-hud-border bg-hud-panel px-3 py-2 font-mono text-xs text-hud-text outline-none focus:border-hud-accent"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-md bg-hud-accent px-4 py-2 text-sm font-medium text-black hover:bg-hud-accent/90 disabled:opacity-50"
+              >
+                Save profile
+              </button>
+            </div>
+          </form>
+        )}
+      </Panel>
+
+      <Panel title="Diagnostics" badge={diagnostics ? <Count value={diagnostics.suggestions.length} /> : undefined}>
+        {diagnostics === null ? (
+          <EmptyState>Loading diagnostics...</EmptyState>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${diagnostics.overall === "ok" ? "bg-hud-accent" : "bg-hud-warn"}`}
+              />
+              <span className="text-sm font-medium text-hud-text capitalize">{diagnostics.overall.replace("_", " ")}</span>
+            </div>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {Object.entries(diagnostics.checks).map(([key, value]) => (
+                <li key={key} className="rounded-md border border-hud-border bg-hud-panel/50 p-2">
+                  <p className="text-[10px] uppercase tracking-wider text-hud-muted">{key}</p>
+                  <p className="text-sm text-hud-text">{value}</p>
+                </li>
+              ))}
+            </ul>
+            {diagnostics.suggestions.length > 0 && (
+              <ul className="space-y-1">
+                {diagnostics.suggestions.map((s, i) => (
+                  <li key={i} className="text-sm text-hud-warn">{s}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Data export">
+        <p className="mb-3 text-sm text-hud-muted">
+          Download a complete snapshot of your data. Secrets are not included — only references to where they are stored.
+        </p>
+        <button
+          onClick={handleExport}
+          disabled={loading}
+          className="rounded-md border border-hud-border px-4 py-2 text-sm text-hud-text hover:border-hud-accent hover:text-hud-accent disabled:opacity-50"
+        >
+          Download JSON export
+        </button>
+      </Panel>
 
       <Panel title="Integrations" badge={<Count value={integrations.length} />}>
         <div className="mb-4 rounded-md border border-hud-border bg-hud-panel/50 p-4">
