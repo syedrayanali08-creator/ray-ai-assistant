@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { AgentFlow } from "@/components/agent-flow";
 import type { TraceEntry } from "@/hooks/use-chat";
 import { describeStage } from "@/lib/chat";
 
@@ -42,19 +43,22 @@ export function AgentTrace({
       </button>
 
       {open && (
-        <ol className="mt-2 space-y-1 border-l border-hud-border pl-3">
-          {trace.map((entry, index) => (
-            <li
-              key={`${entry.stage}-${index}`}
-              className="flex items-baseline gap-2 font-mono text-[11px] text-hud-muted"
-            >
-              <span className="w-16 shrink-0 uppercase tracking-widest text-hud-accent/70">
-                {entry.stage}
-              </span>
-              <span>{describeStage(entry.stage, entry.detail)}</span>
-            </li>
-          ))}
-        </ol>
+        <>
+          <AgentFlow trace={trace} durationMs={durationMs} />
+          <ol className="mt-3 space-y-1 border-l border-hud-border pl-3">
+            {trace.map((entry, index) => (
+              <li
+                key={`${entry.stage}-${index}`}
+                className="flex items-baseline gap-2 font-mono text-[11px] text-hud-muted"
+              >
+                <span className="w-16 shrink-0 uppercase tracking-widest text-hud-accent/70">
+                  {entry.stage}
+                </span>
+                <span>{describeStage(entry.stage, entry.detail)}</span>
+              </li>
+            ))}
+          </ol>
+        </>
       )}
     </div>
   );

@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-export function Composer({
-  onSend,
-  disabled,
-  /** Live speech, shown in place of what the user has typed. */
-  transcript,
-  providerLabel,
-}: {
+export interface ComposerHandle {
+  focus: () => void;
+}
+
+export const Composer = forwardRef<ComposerHandle, {
   onSend: (message: string) => void;
   disabled: boolean;
+  /** Live speech, shown in place of what the user has typed. */
   transcript: string;
   providerLabel: string;
-}) {
+}>(function Composer({ onSend, disabled, transcript, providerLabel }, ref) {
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }));
 
   // Grow to fit a pasted paragraph instead of scrolling a one-line box.
   useEffect(() => {
@@ -52,7 +55,7 @@ export function Composer({
               submit();
             }
           }}
-          placeholder={transcript !== "" ? "" : "Ask Ray anything…"}
+          placeholder={transcript !== "" ? "" : "Ask Ray anything… (/)"}
           aria-label="Message Ray"
           readOnly={transcript !== ""}
           className="flex-1 resize-none bg-transparent text-sm text-hud-text outline-none placeholder:text-hud-muted"
@@ -70,4 +73,4 @@ export function Composer({
       </p>
     </form>
   );
-}
+});
