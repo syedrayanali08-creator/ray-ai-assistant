@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
-import { Composer } from "@/components/composer";
+import { Composer, type ComposerHandle } from "@/components/composer";
+import { useDashboard } from "@/components/dashboard-context";
 import { MessageList } from "@/components/message-list";
+import { Reactor, type ReactorState } from "@/components/reactor";
 import { VoiceControl } from "@/components/voice-control";
 import { useChat } from "@/hooks/use-chat";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard";
 import { useVoice } from "@/hooks/use-voice";
 import type { Health, RestoredConversation } from "@/lib/api";
 
@@ -29,6 +32,8 @@ export function Conversation({
   restored: RestoredConversation | null;
 }) {
   const chat = useChat(restored ?? undefined);
+  const { pendingApprovals, setVoiceState, setAgentName } = useDashboard();
+  const composerRef = useRef<ComposerHandle>(null);
 
   const send = useCallback(
     (message: string, spoken = false) => {
@@ -39,7 +44,8 @@ export function Conversation({
 
   const voice = useVoice({
     onRequest: (text) => send(text, true),
-    onResponse: (request, content, speechText) => chat.appendVoiceResponse(request, content, speechText),
+    onResponse: (request, content, speechText) =>
+      chat.appendVoiceResponse(request, content, speechText),
     wakeWordEnabled: health?.voice?.wake_word_enabled ?? false,
     capabilities: health?.voice ?? null,
   });
@@ -59,11 +65,31 @@ export function Conversation({
     voice.speak(completed.speechText ?? completed.content);
   }, [chat.lastCompleted, voice]);
 
+  // Publish live state to the dashboard context for the status bar and reactor.
+  useEffect(() => {
+    setVoiceState(voice.state);
+  }, [voice.state, setVoiceState]);
+
+  useEffect(() => {
+    setAgentName(chat.lastCompleted?.agentName);
+  }, [chat.lastCompleted?.agentName, setAgentName]);
+
+  const reactorState: ReactorState =
+    pendingApprovals > 0 ? "approval" : voice.state;
+
+  useKeyboardShortcuts({
+    onFocus: () => composerRef.current?.focus(),
+    onStop: () => voice.stop(),
+    onToggleArmed: () => voice.toggleArmed(),
+  });
+
   const provider = health?.llm_provider ?? "offline";
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col rounded-lg border border-hud-border bg-hud-panel/60">
-      <header className="flex items-center justify-between gap-3 border-b border-hud-border px-5 py-3">
+    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-hud-border bg-hud-panel/60">
+      <Reactor state={reactorState} className="absolute inset-0 z-0 opacity-40" />
+
+      <header className="relative z-10 flex items-center justify-between gap-3 border-b border-hud-border px-5 py-3">
         <div className="flex items-center gap-3">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-hud-muted">
             Conversation
@@ -81,14 +107,19 @@ export function Conversation({
         <VoiceControl capabilities={health?.voice ?? null} voice={voice} />
       </header>
 
-      <MessageList messages={chat.messages} userName={userName} onRetry={chat.retry} />
+      <div className="relative z-10 min-h-0 flex-1">
+        <MessageList messages={chat.messages} userName={userName} onRetry={chat.retry} />
+      </div>
 
-      <Composer
-        onSend={send}
-        disabled={chat.sending}
-        transcript={voice.transcript}
-        providerLabel={provider}
-      />
+      <div className="relative z-10">
+        <Composer
+          ref={composerRef}
+          onSend={send}
+          disabled={chat.sending}
+          transcript={voice.transcript}
+          providerLabel={provider}
+        />
+      </div>
     </section>
   );
 }

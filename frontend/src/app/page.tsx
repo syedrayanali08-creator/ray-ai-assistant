@@ -1,6 +1,14 @@
 import { ApprovalQueue } from "@/components/approval-queue";
 import { Conversation } from "@/components/conversation";
-import { AgentPanel, MemoryPanel, ProjectPanel, SchedulePanel, TaskPanel } from "@/components/panels";
+import { DashboardProvider } from "@/components/dashboard-context";
+import {
+  AgentPanel,
+  LearningPanel,
+  MemoryPanel,
+  ProjectPanel,
+  SchedulePanel,
+  TaskPanel,
+} from "@/components/panels";
 import { StatusBar } from "@/components/status-bar";
 import {
   getDashboard,
@@ -13,7 +21,6 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  // All three requests are independent, so they overlap rather than queue.
   const [health, dashboard, conversation] = await Promise.all([
     getHealth(),
     safeDashboard(),
@@ -25,30 +32,33 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="flex h-screen flex-col">
-      <StatusBar health={health} user={dashboard.user} />
+    <DashboardProvider health={health} user={dashboard.user}>
+      <main className="flex h-screen flex-col">
+        <StatusBar />
 
-      <div className="px-4 pt-4">
-        <ApprovalQueue />
-      </div>
+        <div className="px-4 pt-4">
+          <ApprovalQueue />
+        </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
-        <Conversation
-          health={health}
-          userName={dashboard.user?.name ?? "there"}
-          restored={conversation}
-        />
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
+          <Conversation
+            health={health}
+            userName={dashboard.user?.name ?? "there"}
+            restored={conversation}
+          />
 
-        {/* The panel rail: everything Ray knows, always visible (docs/09). */}
-        <aside className="grid min-h-0 grid-rows-[1.2fr_0.8fr_0.8fr_1.2fr_0.8fr] gap-4 overflow-y-auto">
-          <TaskPanel tasks={dashboard.tasks} overdue={dashboard.overdue_count} />
-          <SchedulePanel events={dashboard.today_events} />
-          <ProjectPanel projects={dashboard.projects} />
-          <MemoryPanel memories={dashboard.memories} />
-          <AgentPanel agents={dashboard.agents} />
-        </aside>
-      </div>
-    </main>
+          {/* The panel rail: everything Ray knows, always visible (docs/09). */}
+          <aside className="grid min-h-0 grid-rows-[1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_0.8fr] gap-4 overflow-y-auto">
+            <TaskPanel tasks={dashboard.tasks} overdue={dashboard.overdue_count} />
+            <SchedulePanel events={dashboard.today_events} />
+            <ProjectPanel projects={dashboard.projects} />
+            <MemoryPanel memories={dashboard.memories} />
+            <LearningPanel memories={dashboard.memories} />
+            <AgentPanel agents={dashboard.agents} />
+          </aside>
+        </div>
+      </main>
+    </DashboardProvider>
   );
 }
 

@@ -240,19 +240,34 @@ with one download script. The browser fallback remains available by default.
 
 Complete the Jarvis-style experience.
 
+## Status
+
+Completed. The dashboard now acts as a live HUD: voice state, pending approvals,
+active agent, and agent pipeline are visible at a glance.
+
 ## Tasks
 
-* HUD design pass: dark theme, glow, system panels
-* Cinematic reactor-inspired ambient visuals driven by voice/trace state (idle, listening,
-  thinking, speaking, awaiting approval) with `prefers-reduced-motion` support
-* Agent flow visualization and richer Ray Status
-* Project, memory, and learning panels
-* Purposeful motion only; empty, loading, and error states everywhere
-* Keyboard-first navigation
+* [x] HUD design pass: dark theme, glow, system panels
+* [x] `DashboardContext` sharing health, voice state, active agent, and pending approvals
+      across the dashboard without prop drilling
+* [x] Cinematic reactor-inspired ambient visuals (`Reactor`) driven by voice/trace state
+      (`idle`, `armed`, `listening`, `thinking`, `speaking`, `approval`) with
+      `prefers-reduced-motion` support
+* [x] Agent flow visualization (`AgentFlow`) inside `AgentTrace` showing routing,
+      recall, agent, tools, and reply stages
+* [x] Richer status bar with live voice state, active agent, pending approvals, DB, and
+      provider indicators
+* [x] Project, memory, and learning panels with progress, categories, and deadlines
+* [x] Purposeful motion only; empty states on every panel
+* [x] Keyboard-first navigation (`/` or `Ctrl/Cmd+K` to focus composer, `Escape` to stop,
+      `Ctrl/Cmd+Shift+L` to toggle armed)
 
 ## Completion Criteria
 
-`docs/09` completion criteria are met and the interface is portfolio quality.
+* [x] voice state, pending approvals, and active agent are visible in the status bar
+* [x] the reactor reflects Ray's current state with reduced-motion support
+* [x] the agent trace shows a clickable pipeline diagram for every assistant turn
+* [x] the dashboard is portfolio quality and `docs/09` completion criteria are met
 
 ---
 
