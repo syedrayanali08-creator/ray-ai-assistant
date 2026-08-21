@@ -254,6 +254,29 @@ def _optional_str(arguments: dict[str, object], key: str) -> str | None:
     return str(value) if isinstance(value, str) and value.strip() else None
 
 
+async def _feedback_create_improvement_task(
+    ctx: ToolContext, arguments: dict[str, object]
+) -> dict[str, object]:
+    title = str(arguments.get("title", "")).strip()
+    if not title:
+        raise ServiceError("title is required.")
+    workaround = _optional_str(arguments, "workaround") or ""
+    description = str(arguments.get("description", "")).strip()
+    if workaround:
+        description += f"\n\nWorkaround: {workaround}"
+    task = await task_service.create_task(
+        ctx.session,
+        ctx.user_id,
+        TaskCreate(
+            title=title,
+            description=description,
+            priority=TaskPriority.HIGH,
+            category="improvement",
+        ),
+    )
+    return {"task": task.model_dump(mode="json")}
+
+
 INTERNAL_TOOLS: tuple[Tool, ...] = (
     Tool(
         name="tasks.list",
@@ -392,5 +415,25 @@ INTERNAL_TOOLS: tuple[Tool, ...] = (
         handler=_learning_update,
         side_effect=True,
         summarise=lambda args: f"Record progress on {args.get('topic', '')!r}",
+    ),
+    Tool(
+        name="feedback.create_improvement_task",
+        description=(
+            "Capture something the user finds annoying or wants improved. "
+            "Call this when the user says a workflow is annoying, slow, confusing, "
+            "or should be easier."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "title": _string("Short title for the improvement."),
+                "description": _string("What the user said and why it matters."),
+                "workaround": _string("Any workaround the user already found."),
+            },
+            "required": ["title"],
+        },
+        handler=_feedback_create_improvement_task,
+        side_effect=True,
+        summarise=lambda args: f"Capture improvement: {args.get('title', '')!r}",
     ),
 )

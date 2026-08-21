@@ -17,6 +17,7 @@ from ray.api.routes import (
     integrations,
     memory,
     projects,
+    system,
     tasks,
     tools,
     user,
@@ -25,6 +26,7 @@ from ray.api.routes import (
 from ray.config import get_settings
 from ray.db.session import dispose_engine
 from ray.llm.registry import dispose_registry, get_registry
+from ray.logging_config import configure_logging
 from ray.security.auth import verify_token
 
 log = structlog.get_logger()
@@ -33,6 +35,7 @@ log = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    configure_logging(json=not settings.is_development)
     # Log the resolved chain, not just the preference: "gemini" in the config and
     # no key set is a very different runtime state.
     chain = [
@@ -84,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(approvals.router, dependencies=protected)
     app.include_router(calendar.router, dependencies=protected)
     app.include_router(integrations.router, dependencies=protected)
+    app.include_router(system.router, dependencies=protected)
     # Voice has its own query-param auth because WebSocket browsers cannot set
     # arbitrary headers. It still verifies the API token before accepting.
     app.include_router(voice.router)

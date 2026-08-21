@@ -9,14 +9,14 @@ Specialists subclass this and provide a system prompt and the tool allow-list fr
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 
 from ray.agents.base import Agent, AgentContext, AgentEvent, AgentFinished, AgentToken, load_prompt
-from ray.agents.executive import to_speech
+from ray.agents.speech import to_speech
 from ray.domain.enums import Modality
 from ray.llm.base import CompletionRequest, LLMMessage
-from ray.llm.registry import ProviderRegistry
+from ray.llm.registry import Degradation, ProviderRegistry
 from ray.tools.types import ToolResult
 
 MAX_TOOL_ROUNDS = 3
@@ -26,9 +26,16 @@ MAX_TOOL_ROUNDS = 3
 class ToolUsingAgent(Agent, ABC):
     """A specialist with tools."""
 
-    def __init__(self, providers: ProviderRegistry, *, temperature: float = 0.7) -> None:
+    def __init__(
+        self,
+        providers: ProviderRegistry,
+        *,
+        temperature: float = 0.7,
+        on_degrade: Callable[[Degradation], None] | None = None,
+    ) -> None:
         self._providers = providers
         self._temperature = temperature
+        self._on_degrade = on_degrade
 
     @property
     @abstractmethod
@@ -101,7 +108,7 @@ class ToolUsingAgent(Agent, ABC):
             tools=(),
         )
         content_parts: list[str] = []
-        async for chunk in self._providers.stream(final_request):
+        async for chunk in self._providers.stream(final_request, on_degrade=self._on_degrade):
             if chunk.text:
                 content_parts.append(chunk.text)
                 yield AgentToken(text=chunk.text)

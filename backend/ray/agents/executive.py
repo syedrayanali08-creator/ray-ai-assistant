@@ -3,22 +3,28 @@
 In Phase 2 it answered everything directly. In Phase 4 it either answers directly,
 routes to a specialist, or composes the output of multiple specialists into one
 streaming answer (ADR-0008).
+
+In Phase 8 it becomes a tool-using agent so it can capture user feedback as a task,
+search memory, and keep the final response streaming.
 """
 
+import json
 from collections.abc import AsyncIterator, Callable
+from dataclasses import asdict, dataclass
 
-from ray.agents.base import Agent, AgentContext, AgentEvent, AgentFinished, AgentToken, load_prompt
+from ray.agents.base import AgentContext, AgentEvent, AgentFinished, AgentToken
 from ray.agents.registry import get_agent_spec
-from ray.domain.enums import Modality
-from ray.llm.base import CompletionRequest, LLMMessage, StreamAccumulator
+from ray.agents.speech import to_speech
+from ray.agents.tool_agent import ToolUsingAgent
+from ray.llm.base import CompletionRequest, LLMMessage
 from ray.llm.registry import Degradation, ProviderRegistry
-
-# A spoken answer is read aloud, so length is measured in patience rather than
-# tokens. Anything longer than this gets a spoken summary instead.
-SPEECH_BUDGET_WORDS = 90
+from ray.tools.types import ToolResult
 
 
-class ExecutiveAgent(Agent):
+@dataclass
+class ExecutiveAgent(ToolUsingAgent):
+    """Routes, answers directly, and composes specialist outputs."""
+
     spec = get_agent_spec("executive")
 
     def __init__(
@@ -28,40 +34,16 @@ class ExecutiveAgent(Agent):
         temperature: float = 0.7,
         on_degrade: Callable[[Degradation], None] | None = None,
     ) -> None:
-        self._providers = providers
-        self._temperature = temperature
-        self._on_degrade = on_degrade
+        super().__init__(providers, temperature=temperature, on_degrade=on_degrade)
 
-    def system_prompt(self, ctx: AgentContext) -> str:
-        prompt = load_prompt("executive").replace("{user_name}", ctx.user_name)
-        if ctx.memories:
-            remembered = "\n".join(f"- {m.content}" for m in ctx.memories)
-            prompt += f"\n\n## What you remember about {ctx.user_name}\n\n{remembered}"
-        if ctx.output_modality is Modality.VOICE:
-            prompt += (
-                "\n\n## This answer will be spoken aloud\n\n"
-                "Keep it short and plain. No code blocks, no tables, no bullet lists, "
-                "no markdown syntax — write it the way you would say it."
-            )
-        return prompt
+    @property
+    def prompt_name(self) -> str:
+        return "executive"
 
-    async def run(self, ctx: AgentContext) -> AsyncIterator[AgentEvent]:
-        request = CompletionRequest(
-            messages=[*ctx.history, LLMMessage(role="user", content=ctx.message)],
-            system=self.system_prompt(ctx),
-            temperature=self._temperature,
-        )
+    def _render_tool_result(self, result: ToolResult) -> str:
+        return f"Tool result for {result.tool}: {json.dumps(asdict(result), default=str)}"
 
-        accumulator = StreamAccumulator()
-        async for chunk in self._providers.stream(request, on_degrade=self._on_degrade):
-            accumulator.add(chunk)
-            if chunk.text:
-                yield AgentToken(text=chunk.text)
-
-        content = accumulator.text
-        yield AgentFinished(content=content, speech_text=to_speech(content))
-
-    def compose(
+    async def compose(
         self,
         ctx: AgentContext,
         outputs: list[dict[str, str]],
@@ -87,42 +69,11 @@ class ExecutiveAgent(Agent):
             temperature=self._temperature,
         )
 
-        accumulator = StreamAccumulator()
+        content_parts: list[str] = []
+        async for chunk in self._providers.stream(request, on_degrade=self._on_degrade):
+            if chunk.text:
+                content_parts.append(chunk.text)
+                yield AgentToken(text=chunk.text)
 
-        async def _generator() -> AsyncIterator[AgentEvent]:
-            async for chunk in self._providers.stream(request, on_degrade=self._on_degrade):
-                accumulator.add(chunk)
-                if chunk.text:
-                    yield AgentToken(text=chunk.text)
-            yield AgentFinished(content=accumulator.text, speech_text=to_speech(accumulator.text))
-
-        return _generator()
-
-
-def to_speech(content: str) -> str:
-    """Best-effort spoken rendering of a written answer."""
-    lines: list[str] = []
-    in_code_block = False
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("```"):
-            in_code_block = not in_code_block
-            if not in_code_block:
-                lines.append("I've put the code on screen.")
-            continue
-        if in_code_block or stripped.startswith("|"):
-            continue
-        stripped = stripped.lstrip("#-*> ").replace("**", "").replace("`", "")
-        if stripped:
-            lines.append(stripped)
-
-    spoken = " ".join(lines)
-    words = spoken.split()
-    if len(words) <= SPEECH_BUDGET_WORDS:
-        return spoken
-
-    truncated = " ".join(words[:SPEECH_BUDGET_WORDS])
-    last_stop = max(truncated.rfind("."), truncated.rfind("?"), truncated.rfind("!"))
-    if last_stop > 0:
-        truncated = truncated[: last_stop + 1]
-    return f"{truncated} The rest is on screen."
+        content = "".join(content_parts)
+        yield AgentFinished(content=content, speech_text=to_speech(content))

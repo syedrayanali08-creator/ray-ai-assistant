@@ -51,6 +51,50 @@
             "HTTPBearer": []
           }
         ]
+      },
+      "patch": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Update Current User",
+        "operationId": "update_current_user_auth_user_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/dashboard": {
@@ -2129,6 +2173,59 @@
           }
         }
       }
+    },
+    "/system/diagnostics": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Diagnostics",
+        "operationId": "diagnostics_system_diagnostics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/system/export": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Export Data",
+        "description": "Return a complete, user-owned snapshot of Ray data.\n\nSecrets are not included: ``credentials_reference`` is the *name* of an env var\nor keyring key, not the value (docs/12).",
+        "operationId": "export_data_system_export_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportSnapshot"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2596,6 +2693,36 @@
         ],
         "title": "DashboardSummary"
       },
+      "DiagnosticsResponse": {
+        "properties": {
+          "overall": {
+            "type": "string",
+            "title": "Overall"
+          },
+          "checks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Checks"
+          },
+          "suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overall",
+          "checks",
+          "suggestions"
+        ],
+        "title": "DiagnosticsResponse",
+        "description": "Detailed self-diagnosis for the UI /settings page and CLI."
+      },
       "EventSource": {
         "type": "string",
         "enum": [
@@ -2605,6 +2732,86 @@
           "notion"
         ],
         "title": "EventSource"
+      },
+      "ExportSnapshot": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "exported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Exported At"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRead"
+          },
+          "memories": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryRead"
+            },
+            "type": "array",
+            "title": "Memories"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectRead"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskRead"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarEventRead"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "integrations": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationRead"
+            },
+            "type": "array",
+            "title": "Integrations"
+          },
+          "tool_permissions": {
+            "items": {
+              "$ref": "#/components/schemas/ToolPermissionRead"
+            },
+            "type": "array",
+            "title": "Tool Permissions"
+          },
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationRead"
+            },
+            "type": "array",
+            "title": "Conversations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "exported_at",
+          "user",
+          "memories",
+          "projects",
+          "tasks",
+          "events",
+          "integrations",
+          "tool_permissions",
+          "conversations"
+        ],
+        "title": "ExportSnapshot",
+        "description": "A complete, user-owned data export (docs/12, docs/13)."
       },
       "HTTPValidationError": {
         "properties": {
@@ -2639,6 +2846,13 @@
           },
           "voice": {
             "$ref": "#/components/schemas/VoiceCapabilities"
+          },
+          "diagnostics": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Diagnostics"
           }
         },
         "type": "object",
@@ -2731,6 +2945,17 @@
           "status": {
             "$ref": "#/components/schemas/IntegrationStatus"
           },
+          "credentials_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credentials Reference"
+          },
           "config": {
             "additionalProperties": true,
             "type": "object",
@@ -2777,6 +3002,7 @@
           "provider",
           "enabled",
           "status",
+          "credentials_reference",
           "config",
           "last_sync",
           "last_error",
@@ -3817,6 +4043,23 @@
         "title": "ToolInvocationRead",
         "description": "One tool call. The approval card is rendered from ``payload`` (ADR-0014), so\nthe user approves the action that will actually run."
       },
+      "ToolPermissionRead": {
+        "properties": {
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/PermissionMode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_name",
+          "mode"
+        ],
+        "title": "ToolPermissionRead"
+      },
       "ToolPermissionUpdate": {
         "properties": {
           "mode": {
@@ -3877,6 +4120,61 @@
           "created_at"
         ],
         "title": "UserRead"
+      },
+      "UserUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferences"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settings"
+          }
+        },
+        "type": "object",
+        "title": "UserUpdate"
       },
       "ValidationError": {
         "properties": {

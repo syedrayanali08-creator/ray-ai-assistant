@@ -49,13 +49,14 @@ _BACKGROUND: set[asyncio.Task[None]] = set()
 
 
 def _agent_instance(name: str, providers: ProviderRegistry) -> Any:
-    return {
+    constructors: dict[str, type] = {
         "executive": ExecutiveAgent,
         "planning": PlanningAgent,
         "coding": CodingAgent,
         "learning": LearningAgent,
         "research": ResearchAgent,
-    }[name](providers)
+    }
+    return constructors[name](providers)
 
 
 class Orchestrator:

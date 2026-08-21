@@ -40,3 +40,15 @@ async def test_valid_token_resolves_the_seeded_user(auth_client: AsyncClient) ->
 async def test_token_is_not_a_prefix_match(client: AsyncClient) -> None:
     client.headers["Authorization"] = f"Bearer {TEST_TOKEN}-extra"
     assert (await client.get("/dashboard")).status_code == 401
+
+
+async def test_update_current_user(auth_client: AsyncClient) -> None:
+    response = await auth_client.patch(
+        "/auth/user",
+        json={"name": "Updated", "email": "updated@example.com", "preferences": {"theme": "dark"}},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Updated"
+    assert data["email"] == "updated@example.com"
+    assert data["preferences"] == {"theme": "dark"}

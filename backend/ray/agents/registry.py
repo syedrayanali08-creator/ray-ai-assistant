@@ -29,7 +29,7 @@ AGENTS: dict[str, AgentSpec] = {
             "Understands the request, decides which specialist should handle it, and "
             "composes the final answer in Ray's voice."
         ),
-        tools=("memory.search",),
+        tools=("memory.search", "feedback.create_improvement_task"),
     ),
     "planning": AgentSpec(
         name="planning",
